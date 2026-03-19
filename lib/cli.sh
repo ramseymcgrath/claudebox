@@ -82,15 +82,26 @@ get_command_requirements() {
     
     case "$cmd" in
         # Pure host commands - no Docker or image needed
-        profiles|projects|help|-h|--help|slots|create|revoke|clean|import|unlink|kill)
+        profiles|projects|help|-h|--help|slots|create|revoke|clean|import|unlink|kill|auth|tunnel)
             echo "none"
             ;;
         # Commands that need image name but not Docker
         info|profile|add|remove|install|allowlist|save)
             echo "image"
             ;;
+        # MCP subcommands: install/remove/list/status are host-side; others need Docker
+        mcp)
+            case "$subcommand" in
+                install|add|remove|uninstall|list|ls|status|"")
+                    echo "image"
+                    ;;
+                *)
+                    echo "docker"
+                    ;;
+            esac
+            ;;
         # Commands that need Docker and will run containers
-        shell|project|rebuild|update|config|mcp|migrate-installer|tmux|slot|"")
+        shell|project|rebuild|update|config|migrate-installer|tmux|slot|"")
             echo "docker"
             ;;
         # Unknown commands are forwarded to Claude in container

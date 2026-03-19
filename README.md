@@ -1,478 +1,243 @@
-# ClaudeBox 🐳
+# ClaudeBox
 
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![GitHub](https://img.shields.io/badge/GitHub-RchGrav%2Fclaudebox-blue.svg)](https://github.com/RchGrav/claudebox)
 
-The Ultimate Claude Code Docker Development Environment - Run Claude AI's coding assistant in a fully containerized, reproducible environment with pre-configured development profiles and MCP servers.
+Docker-based development environment for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Runs Claude in isolated containers with development profiles, MCP server management, multi-slot parallel instances, and Cloudflare tunnel support.
 
-```
- ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
-██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝
-██║     ██║     ███████║██║   ██║██║  ██║█████╗
-██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝
-╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗
- ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝
-
-██████╗  ██████╗ ██╗  ██╗
-██╔══██╗██╔═══██╗╚██╗██╔╝
-██████╔╝██║   ██║ ╚███╔╝ 
-██╔══██╗██║   ██║ ██╔██╗ 
-██████╔╝╚██████╔╝██╔╝ ██╗
-╚═════╝  ╚═════╝ ╚═╝  ╚═╝
-```
-
-## 🚀 What's New in Latest Update
-
-- **Enhanced UI/UX**: Improved menu alignment and comprehensive info display
-- **New `profiles` Command**: Quick listing of all available profiles with descriptions
-- **Firewall Management**: New `allowlist` command to view/edit network allowlists
-- **Per-Project Isolation**: Separate Docker images, auth state, history, and configs
-- **Improved Clean Menu**: Clear descriptions showing exact paths that will be removed
-- **Profile Management Menu**: Interactive profile command with status and examples
-- **Persistent Project Data**: Auth state, shell history, and tool configs preserved
-- **Smart Profile Dependencies**: Automatic dependency resolution (e.g., C includes build-tools)
-
-## ✨ Features
-
-- **Containerized Environment**: Run Claude Code in an isolated Docker container
-- **Development Profiles**: Pre-configured language stacks (C/C++, Python, Rust, Go, etc.)
-- **Project Isolation**: Complete separation of images, settings, and data between projects
-- **Persistent Configuration**: Settings and data persist between sessions
-- **Multi-Instance Support**: Work on multiple projects simultaneously
-- **Package Management**: Easy installation of additional development tools
-- **Auto-Setup**: Handles Docker installation and configuration automatically
-- **Security Features**: Network isolation with project-specific firewall allowlists
-- **Developer Experience**: GitHub CLI, Delta, fzf, and zsh with oh-my-zsh powerline
-- **Python Virtual Environments**: Automatic per-project venv creation with uv
-- **Cross-Platform**: Works on Ubuntu, Debian, Fedora, Arch, and more
-- **Shell Experience**: Powerline zsh with syntax highlighting and autosuggestions
-- **Tmux Integration**: Seamless tmux socket mounting for multi-pane workflows
-
-## 📋 Prerequisites
-
-- Linux or macOS (WSL2 for Windows)
-- Bash shell
-- Docker (will be installed automatically if missing)
-
-## 🛠️ Installation
-
-ClaudeBox v2.0.0 offers two installation methods:
-
-### Method 1: Self-Extracting Installer (Recommended)
-
-The self-extracting installer is ideal for automated setups and quick installation:
+## Install
 
 ```bash
-# Download the latest release
+# Self-extracting installer
 wget https://github.com/RchGrav/claudebox/releases/latest/download/claudebox.run
-chmod +x claudebox.run
-./claudebox.run
+chmod +x claudebox.run && ./claudebox.run
 ```
 
-This will:
-- Extract ClaudeBox to `~/.claudebox/source/`
-- Create a symlink at `~/.local/bin/claudebox` (you may need to add `~/.local/bin` to your PATH)
-- Show setup instructions if PATH configuration is needed
-
-### Method 2: Archive Installation
-
-For manual installation or custom locations, use the archive:
-
+Or clone and run directly:
 ```bash
-# Download the archive
-wget https://github.com/RchGrav/claudebox/releases/latest/download/claudebox-2.0.0.tar.gz
-
-# Extract to your preferred location
-mkdir -p ~/my-tools/claudebox
-tar -xzf claudebox-2.0.0.tar.gz -C ~/my-tools/claudebox
-
-# Run main.sh to create symlink
-cd ~/my-tools/claudebox
-./main.sh
-
-# Or create your own symlink
-ln -s ~/my-tools/claudebox/main.sh ~/.local/bin/claudebox
-```
-
-### Development Installation
-
-For development or testing the latest changes:
-```bash
-# Clone the repository
 git clone https://github.com/RchGrav/claudebox.git
-cd claudebox
-
-# Build the installer
-bash .builder/build.sh
-
-# Run the installer
-./claudebox.run
+cd claudebox && ./main.sh
 ```
 
-### PATH Configuration
+Add `~/.local/bin` to your PATH if the `claudebox` command isn't found.
 
-If `claudebox` command is not found after installation, add `~/.local/bin` to your PATH:
+## Quick Start
 
 ```bash
-# For Bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-
-# For Zsh (macOS default)
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+cd ~/your-project
+claudebox create        # Create a container slot
+claudebox               # Launch Claude
 ```
 
-The installer will:
-- ✅ Extract ClaudeBox to `~/.claudebox/source/`
-- ✅ Create symlink at `~/.local/bin/claudebox`
-- ✅ Check for Docker (install if needed on first run)
-- ✅ Configure Docker for non-root usage (on first run)
+## Profiles
 
-
-## 📚 Usage
-
-### Basic Usage
+Pre-configured language stacks installed as Docker layers. Add them per-project:
 
 ```bash
-# Launch Claude Code CLI
-claudebox
-
-# Pass arguments to Claude
-claudebox --model opus -c
-
-# Save your arguments so you don't need to type them every time
-claudebox --model opus -c
-
-# View the Claudebox info screen
-claudebox info
-
-# Get help
-claudebox --help        # Shows Claude help with ClaudeBox additions
+claudebox profiles              # List all available profiles
+claudebox add python rust       # Add profiles
+claudebox remove rust           # Remove a profile
 ```
 
-### Multi-Instance Support
+| Profile | What it installs |
+|---------|-----------------|
+| `core` | gcc, g++, make, git, pkg-config, OpenSSL, tmux |
+| `build-tools` | CMake, Ninja, autoconf, automake, libtool |
+| `shell` | rsync, SSH, man, gnupg, fzf, file |
+| `networking` | iptables, ipset, iproute2, DNS utils |
+| `c` | gdb, valgrind, clang, cppcheck, Boost, ncurses, cmocka |
+| `rust` | Rust toolchain via rustup |
+| `python` | Python via uv (venv + dev tools managed at runtime) |
+| `go` | Go from upstream tarball |
+| `javascript` | Node.js via nvm, TypeScript, ESLint, Prettier |
+| `java` | Latest LTS via SDKMan, Maven, Gradle, Ant |
+| `ruby` | Ruby, gems, native extension deps |
+| `php` | PHP, extensions, Composer |
+| `flutter` | Flutter via fvm |
+| `openwrt` | Cross toolchain, QEMU, distro tools |
+| `database` | PostgreSQL, MySQL, SQLite, Redis, MongoDB clients |
+| `devops` | Docker, kubectl, Helm, Terraform, Ansible, AWS CLI |
+| `web` | nginx, Apache bench, HTTPie |
+| `embedded` | ARM GCC, GDB multiarch, OpenOCD, PlatformIO |
+| `datascience` | R, Jupyter, NumPy, pandas, scikit-learn (via uv) |
+| `security` | nmap, tcpdump, Wireshark, netcat, John, Hashcat |
+| `ml` | PyTorch, transformers, scikit-learn (via uv) |
+| `tunnel` | cloudflared for Cloudflare Tunnel / Access |
 
-ClaudeBox supports running multiple instances in different projects simultaneously:
+### Custom Profiles
+
+Drop `.sh` files into `~/.claudebox/custom-profiles/`. Each file contains Dockerfile instructions. The first `#` comment line becomes the description.
 
 ```bash
-# Terminal 1 - Project A
-cd ~/projects/website
-claudebox
-
-# Terminal 2 - Project B
-cd ~/projects/api
-claudebox shell
-
-# Terminal 3 - Project C
-cd ~/projects/ml-model
-claudebox profile python ml
+# ~/.claudebox/custom-profiles/mytools.sh
+# My custom development tools
+RUN apt-get update && apt-get install -y htop ncdu && apt-get clean
 ```
 
-Each project maintains its own:
-- Docker image (`claudebox-<project-name>`)
-- Language profiles and installed packages
-- Firewall allowlist
-- Python virtual environment
-- Memory and context (via MCP)
-- Claude configuration (`.claude.json`)
+Then: `claudebox add mytools`
 
-### Development Profiles
+## MCP Servers
 
-ClaudeBox includes 15+ pre-configured development environments:
+Install MCP servers directly into the Docker image:
 
 ```bash
-# List all available profiles with descriptions
-claudebox profiles
+claudebox mcp install memory          # Knowledge graph memory
+claudebox mcp install filesystem -- /workspace
+claudebox mcp install datadog         # Datadog monitoring
+claudebox mcp install context7        # Library docs
+claudebox mcp install @org/custom-mcp # Any npm package
 
-# Interactive profile management menu
-claudebox profile
-
-# Check current project's profiles
-claudebox profile status
-
-# Install specific profiles (project-specific)
-claudebox profile python ml       # Python + Machine Learning
-claudebox profile c openwrt       # C/C++ + OpenWRT
-claudebox profile rust go         # Rust + Go
+claudebox mcp list                    # Show known + installed
+claudebox mcp remove memory           # Uninstall
+claudebox mcp status                  # Show config
 ```
 
-#### Available Profiles:
+Installed servers persist across container restarts. Their configs are automatically passed to Claude via `--mcp-config`.
 
-**Core Profiles:**
-- **core** - Core Development Utilities (compilers, VCS, shell tools)
-- **build-tools** - Build Tools (CMake, autotools, Ninja)
-- **shell** - Optional Shell Tools (fzf, SSH, man, rsync, file)
-- **networking** - Network Tools (IP stack, DNS, route tools)
+**Known servers:** filesystem, memory, fetch, brave-search, github, gitlab, google-maps, slack, postgres, sqlite, puppeteer, sequential-thinking, git, time, everything, context7, datadog, aws-kb, sentry, linear.
 
-**Language Profiles:**
-- **c** - C/C++ Development (debuggers, analyzers, Boost, ncurses, cmocka)
-- **rust** - Rust Development (installed via rustup)
-- **python** - Python Development (managed via uv)
-- **go** - Go Development (installed from upstream archive)
-- **flutter** - Flutter Framework (installed using fvm, use FLUTTER_SDK_VERSION to set different version)
-- **javascript** - JavaScript/TypeScript (Node installed via nvm)
-- **java** - Java Development (Latest LTS via SDKMan, Maven, Gradle, Ant)
-- **ruby** - Ruby Development (gems, native deps, XML/YAML)
-- **php** - PHP Development (PHP + extensions + Composer)
+## Multi-Slot Containers
 
-**Specialized Profiles:**
-- **openwrt** - OpenWRT Development (cross toolchain, QEMU, distro tools)
-- **database** - Database Tools (clients for major databases)
-- **devops** - DevOps Tools (Docker, Kubernetes, Terraform, etc.)
-- **web** - Web Dev Tools (nginx, HTTP test clients)
-- **embedded** - Embedded Dev (ARM toolchain, serial debuggers)
-- **datascience** - Data Science (Python, Jupyter, R)
-- **security** - Security Tools (scanners, crackers, packet tools)
-- **ml** - Machine Learning (build layer only; Python via uv)
-
-### Default Flags Management
-
-Save your preferred security flags to avoid typing them every time:
+Run multiple authenticated Claude instances in the same project:
 
 ```bash
-# Save default flags
-claudebox save --enable-sudo --disable-firewall
-
-# Clear saved flags
-claudebox save
-
-# Now all claudebox commands will use your saved flags automatically
-claudebox  # Will run with sudo and firewall disabled
+claudebox create                # Create a new slot
+claudebox create                # Create another
+claudebox slots                 # List all slots with auth status
+claudebox slot 2                # Launch a specific slot
 ```
 
-### Project Information
+Each slot has its own authentication, config, and cache. Containers are ephemeral (auto-cleanup via `--rm`), but slot data persists.
 
-View comprehensive information about your ClaudeBox setup:
+### Tmux Multi-Pane
 
 ```bash
-# Show detailed project and system information
-claudebox info
+claudebox tmux 3                # Launch 3 Claude instances in tmux panes
+claudebox tmux 2 1              # 2 panes in window 1, 1 in window 2
+claudebox tmux conf             # Install ClaudeBox tmux config
 ```
 
-The info command displays:
-- **Current Project**: Path, ID, and data directory
-- **ClaudeBox Installation**: Script location and symlink
-- **Saved CLI Flags**: Your default flags configuration
-- **Claude Commands**: Global and project-specific custom commands
-- **Project Profiles**: Installed profiles, packages, and available options
-- **Docker Status**: Image status, creation date, layers, running containers
-- **All Projects Summary**: Total projects, images, and Docker system usage
+## Persistent Auth
 
-### Package Management
+Save your authentication token once and share it across all containers:
 
 ```bash
-# Install additional packages (project-specific)
-claudebox install htop vim tmux
-
-# Open a powerline zsh shell in the container
-claudebox shell
-
-# Update Claude CLI
-claudebox update
-
-# View/edit firewall allowlist
-claudebox allowlist
+claudebox auth save             # Save current slot's token
+claudebox auth status           # Check token status
+claudebox auth clear            # Remove saved token
 ```
 
-### Tmux Integration
+## Cloudflare Tunnel
 
-ClaudeBox provides tmux support for multi-pane workflows:
-
-```bash
-# Launch ClaudeBox with tmux support
-claudebox tmux
-
-# If you're already in a tmux session, the socket will be automatically mounted
-# Otherwise, tmux will be available inside the container
-
-# Use tmux commands inside the container:
-# - Create new panes: Ctrl+b % (vertical) or Ctrl+b " (horizontal)
-# - Switch panes: Ctrl+b arrow-keys  
-# - Create new windows: Ctrl+b c
-# - Switch windows: Ctrl+b n/p or Ctrl+b 0-9
-```
-
-ClaudeBox automatically detects and mounts existing tmux sockets from the host, or provides tmux functionality inside the container for powerful multi-context workflows.
-
-### Task Engine
-
-ClaudeBox contains a compact task engine for reliable code generation tasks:
+Access services on your private LAN from inside containers via Cloudflare Access:
 
 ```bash
-# In Claude, use the task command
-/task
-
-# This provides a systematic approach to:
-# - Breaking down complex tasks
-# - Implementing with quality checks
-# - Iterating until specifications are met
-```
-
-### Security Options
-
-```bash
-# Run with sudo enabled (use with caution)
-claudebox --enable-sudo
-
-# Disable network firewall (allows all network access)
-claudebox --disable-firewall
-
-# Skip permission checks
-claudebox --dangerously-skip-permissions
-```
-
-### Maintenance
-
-```bash
-# Interactive clean menu
-claudebox clean
-
-# Project-specific cleanup options
-claudebox clean --project          # Shows submenu with options:
-  # profiles - Remove profile configuration (*.ini file)
-  # data     - Remove project data (auth, history, configs, firewall)
-  # docker   - Remove project Docker image
-  # all      - Remove everything for this project
-
-# Global cleanup options
-claudebox clean --containers       # Remove ClaudeBox containers
-claudebox clean --image           # Remove containers and current project image
-claudebox clean --cache           # Remove Docker build cache
-claudebox clean --volumes         # Remove ClaudeBox volumes
-claudebox clean --all             # Complete Docker cleanup
-
-# Rebuild the image from scratch
+claudebox tunnel setup internal.example.com
+claudebox tunnel service-token <id> <secret>    # Headless auth (no browser)
+claudebox tunnel forward 8080:api.lan:443       # Auto-proxy on container start
+claudebox add tunnel                            # Install cloudflared
 claudebox rebuild
 ```
 
-## 🔧 Configuration
+Inside the container, all `cloudflared access` commands work:
 
-ClaudeBox stores data in:
-- `~/.claude/` - Global Claude configuration (mounted read-only)
-- `~/.claudebox/` - Global ClaudeBox data
-- `~/.claudebox/profiles/` - Per-project profile configurations (*.ini files)
-- `~/.claudebox/<project-name>/` - Project-specific data:
-  - `.claude/` - Project auth state
-  - `.claude.json` - Project API configuration
-  - `.zsh_history` - Shell history
-  - `.config/` - Tool configurations
-  - `firewall/allowlist` - Network allowlist
-- Current directory mounted as `/workspace` in container
-
-### Project-Specific Features
-
-Each project automatically gets:
-- **Docker Image**: `claudebox-<project-name>` with installed profiles
-- **Profile Configuration**: `~/.claudebox/profiles/<project-name>.ini`
-- **Python Virtual Environment**: `.venv` created with uv when Python profile is active
-- **Firewall Allowlist**: Customizable per-project network access rules
-- **Claude Configuration**: Project-specific `.claude.json` settings
-
-### Environment Variables
-
-- `ANTHROPIC_API_KEY` - Your Anthropic API key
-- `NODE_ENV` - Node environment (default: production)
-
-## 🏗️ Architecture
-
-ClaudeBox creates a per-project Debian-based Docker image with:
-- Node.js (via NVM for version flexibility)
-- Claude Code CLI (@anthropic-ai/claude-code)
-- User account matching host UID/GID
-- Network firewall (project-specific allowlists)
-- Volume mounts for workspace and configuration
-- GitHub CLI (gh) for repository operations
-- Delta for enhanced git diffs (version 0.17.0)
-- uv for fast Python package management
-- Nala for improved apt package management
-- fzf for fuzzy finding
-- zsh with oh-my-zsh and powerline theme
-- Profile-specific development tools with intelligent layer caching
-- Persistent project state (auth, history, configs)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🐛 Troubleshooting
-
-### Docker Permission Issues
-ClaudeBox automatically handles Docker setup, but if you encounter issues:
-1. The script will add you to the docker group
-2. You may need to log out/in or run `newgrp docker`
-3. Run `claudebox` again
-
-### Profile Installation Failed
 ```bash
-# Clean and rebuild for current project
-claudebox clean --project
-claudebox rebuild
-claudebox profile <name>
+cloudflared access tcp --hostname app.example.com --url localhost:8080
+cloudflared access curl https://internal.example.com/api
+cloudflared access ssh --hostname ssh.example.com
 ```
 
-### Profile Changes Not Taking Effect
-ClaudeBox automatically detects profile changes and rebuilds when needed. If you're having issues:
-```bash
-# Force rebuild
-claudebox rebuild
+Service tokens (`--service-token-id` / `--service-token-secret`) are injected automatically when configured.
+
+## Commands
+
+```
+claudebox                           Launch Claude interactively
+claudebox <claude-args>             Pass arguments through to Claude
+claudebox shell                     Open a zsh shell in the container
+claudebox shell admin               Shell with sudo enabled
+
+claudebox profiles                  List available profiles
+claudebox add <profiles...>         Add development profiles
+claudebox remove <profiles...>      Remove profiles
+claudebox install <packages...>     Install apt packages
+
+claudebox mcp install <server>      Install an MCP server
+claudebox mcp remove <server>       Remove an MCP server
+claudebox mcp list                  List known/installed servers
+
+claudebox create                    Create a new container slot
+claudebox slots                     List all slots
+claudebox slot <n>                  Launch specific slot
+claudebox kill [all|hash]           Stop containers
+
+claudebox auth save                 Save auth token persistently
+claudebox tunnel setup <host>       Configure tunnel endpoint
+claudebox tunnel service-token ...  Set Access service token
+
+claudebox info                      Show project/system info
+claudebox projects                  List all ClaudeBox projects
+claudebox project <name>            Open project by name
+claudebox allowlist                 View/edit firewall rules
+
+claudebox save [flags...]           Save default CLI flags
+claudebox rebuild                   Force Docker image rebuild
+claudebox update                    Update Claude CLI
+claudebox tmux [layout]             Launch with tmux
+claudebox clean                     Cleanup menu
 ```
 
-### Python Virtual Environment Issues
-ClaudeBox automatically creates a venv when Python profile is active:
-```bash
-# The venv is created at ~/.claudebox/<project>/.venv
-# It's automatically activated in the container
-claudebox shell
-which python  # Should show the venv python
+### Flags
+
+```
+--verbose               Detailed debug output
+--enable-sudo           Enable passwordless sudo in container
+--disable-firewall      Disable network restrictions
 ```
 
-### Can't Find Command
-Ensure the symlink was created:
-```bash
-ls -la ~/.local/bin/claudebox
-# Or manually create it
-ln -s /path/to/claudebox ~/.local/bin/claudebox
+## How It Works
+
+ClaudeBox builds two Docker image layers:
+
+1. **`claudebox-core`** -- Debian bookworm base with Node.js (nvm), uv, Claude CLI, zsh, gh, fzf, delta, tmux
+2. **`claudebox-<project>`** -- Project-specific layer with installed profiles
+
+Containers mount your project at `/workspace`, slot data from `~/.claudebox/projects/`, and SSH keys read-only. Each slot gets isolated `.claude/`, `.config/`, and `.cache/` directories.
+
+Named containers use `--rm` for automatic cleanup. Slot directories on the host are the persistent state; Docker container names serve as locks (no lock files).
+
+### Directory Layout
+
+```
+~/.claudebox/
+  projects/<project-hash>/
+    profiles.ini                    # Active profiles
+    <slot-hash>/                    # Per-slot data
+      .claude/                      # Auth, settings, commands
+      .config/                      # Tool configs
+      .cache/                       # Caches
+  auth/credentials.json             # Persistent auth token
+  cloudflared/                      # Tunnel credentials
+  mcp-config.json                   # Installed MCP server configs
+  mcp-servers.ini                   # Installed server tracking
+  custom-profiles/                  # User-defined profiles
+  default-flags                     # Saved CLI flags
 ```
 
-### Multiple Instance Conflicts
-Each project has its own Docker image and is fully isolated. To check status:
-```bash
-# Check all ClaudeBox images and containers
-claudebox info
+## Troubleshooting
 
-# Clean project-specific data
-claudebox clean --project
-```
+**Docker permission issues:** ClaudeBox adds you to the docker group automatically. Log out and back in, or run `newgrp docker`.
 
-### Build Cache Issues
-If builds are slow or failing:
-```bash
-# Clear Docker build cache
-claudebox clean --cache
+**Profile changes not applied:** ClaudeBox detects profile hash changes and rebuilds automatically. Force it with `claudebox rebuild`.
 
-# Complete cleanup and rebuild
-claudebox clean --all
-claudebox
-```
+**Python venv issues:** The venv is created at container startup via uv. Run `claudebox shell` and check `which python`.
 
-## 🎉 Acknowledgments
+**Build failures:** `claudebox clean --cache` clears Docker build cache. `claudebox clean --all` for a full reset.
 
-- [Anthropic](https://www.anthropic.com/) for Claude AI
-- [Model Context Protocol](https://github.com/anthropics/model-context-protocol) for MCP servers
-- Docker community for containerization tools
-- All the open-source projects included in the profiles
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-Made with ❤️ for developers who love clean, reproducible environments
-
-## Contact
-
-**Author/Maintainer:** RchGrav  
-**GitHub:** [@RchGrav](https://github.com/RchGrav)
+**Maintained by:** [ramseymcgrath](https://github.com/ramseymcgrath)

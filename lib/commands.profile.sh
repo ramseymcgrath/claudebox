@@ -6,38 +6,47 @@
 
 _cmd_profiles() {
     # Get current profiles
-    local current_profiles=($(get_current_profiles))
-    
+    local current_profiles=()
+    while IFS= read -r line; do
+        if [[ -n "$line" ]]; then
+            current_profiles+=("$line")
+        fi
+    done < <(get_current_profiles)
+
     # Show logo first
     logo_small
     printf '\n'
-    
+
     # Show commands at the top
     printf '%s\n' "Commands:"
     printf "  ${CYAN}claudebox add <profiles...>${NC}    - Add development profiles to your project\n"
     printf "  ${CYAN}claudebox remove <profiles...>${NC} - Remove profiles from your project\n"
     printf '\n'
-    
+
     # Show currently enabled profiles
     if [[ ${#current_profiles[@]} -gt 0 ]]; then
         cecho "Currently enabled:" "$YELLOW"
         printf "  %s\n" "${current_profiles[*]}"
         printf '\n'
     fi
-    
+
     # Show available profiles
     cecho "Available profiles:" "$CYAN"
     printf '\n'
-    for profile in $(get_all_profile_names | tr ' ' '\n' | sort); do
-        local desc=$(get_profile_description "$profile")
+
+    # Show built-in profiles
+    for profile in $(_builtin_profile_names | tr ' ' '\n' | sort); do
+        local desc
+        desc=$(get_profile_description "$profile")
         local is_enabled=false
-        # Check if profile is currently enabled
-        for enabled in "${current_profiles[@]}"; do
-            if [[ "$enabled" == "$profile" ]]; then
-                is_enabled=true
-                break
-            fi
-        done
+        if [[ ${#current_profiles[@]} -gt 0 ]]; then
+            for enabled in "${current_profiles[@]}"; do
+                if [[ "$enabled" == "$profile" ]]; then
+                    is_enabled=true
+                    break
+                fi
+            done
+        fi
         printf "  ${GREEN}%-15s${NC} " "$profile"
         if [[ "$is_enabled" == "true" ]]; then
             printf "${GREEN}✓${NC} "
@@ -46,6 +55,36 @@ _cmd_profiles() {
         fi
         printf "%s\n" "$desc"
     done
+
+    # Show custom profiles if any exist
+    local custom_names
+    custom_names=$(get_custom_profile_names)
+    if [[ -n "$custom_names" ]]; then
+        printf '\n'
+        cecho "Custom profiles (from ~/.claudebox/custom-profiles/):" "$CYAN"
+        printf '\n'
+        for profile in $custom_names; do
+            local desc
+            desc=$(get_custom_profile_description "$profile")
+            local is_enabled=false
+            if [[ ${#current_profiles[@]} -gt 0 ]]; then
+                for enabled in "${current_profiles[@]}"; do
+                    if [[ "$enabled" == "$profile" ]]; then
+                        is_enabled=true
+                        break
+                    fi
+                done
+            fi
+            printf "  ${GREEN}%-15s${NC} " "$profile"
+            if [[ "$is_enabled" == "true" ]]; then
+                printf "${GREEN}✓${NC} "
+            else
+                printf "  "
+            fi
+            printf "%s\n" "$desc"
+        done
+    fi
+
     printf '\n'
     exit 0
 }
@@ -53,20 +92,23 @@ _cmd_profiles() {
 _cmd_profile() {
     # Profile menu/help
     logo_small
-    echo
+    printf '\n'
     cecho "ClaudeBox Profile Management:" "$CYAN"
-    echo
-    echo -e "  ${GREEN}profiles${NC}                 Show all available profiles"
-    echo -e "  ${GREEN}add <names...>${NC}           Add development profiles"
-    echo -e "  ${GREEN}remove <names...>${NC}        Remove development profiles"  
-    echo -e "  ${GREEN}add status${NC}               Show current project's profiles"
-    echo
+    printf '\n'
+    printf "  ${GREEN}profiles${NC}                 Show all available profiles\n"
+    printf "  ${GREEN}add <names...>${NC}           Add development profiles\n"
+    printf "  ${GREEN}remove <names...>${NC}        Remove development profiles\n"
+    printf '\n'
+    cecho "Custom Profiles:" "$YELLOW"
+    printf "  Drop .sh files into ${CYAN}~/.claudebox/custom-profiles/${NC}\n"
+    printf "  First comment line becomes the description.\n"
+    printf '\n'
     cecho "Examples:" "$YELLOW"
-    echo "  claudebox profiles              # See all available profiles"
-    echo "  claudebox add python rust       # Add Python and Rust profiles"
-    echo "  claudebox remove rust           # Remove Rust profile"
-    echo "  claudebox add status            # Check current project's profiles"
-    echo
+    printf '%s\n' "  claudebox profiles              # See all available profiles"
+    printf '%s\n' "  claudebox add python rust       # Add Python and Rust profiles"
+    printf '%s\n' "  claudebox remove rust           # Remove Rust profile"
+    printf '%s\n' "  claudebox add status            # Check current project's profiles"
+    printf '\n'
     exit 0
 }
 
@@ -84,7 +126,7 @@ _cmd_add() {
             if [[ -f "$profile_file" ]]; then
                 local current_profiles=()
                 while IFS= read -r line; do
-                    [[ -n "$line" ]] && current_profiles+=("$line")
+                    if [[ -n "$line" ]]; then current_profiles+=("$line"); fi
                 done < <(read_profile_section "$profile_file" "profiles")
                 if [[ ${#current_profiles[@]} -gt 0 ]]; then
                     cecho "Active profiles: ${current_profiles[*]}" "$GREEN"
@@ -93,9 +135,8 @@ _cmd_add() {
                 fi
 
                 local current_packages=()
-                local current_packages=()
                 while IFS= read -r line; do
-                    [[ -n "$line" ]] && current_packages+=("$line")
+                    if [[ -n "$line" ]]; then current_packages+=("$line"); fi
                 done < <(read_profile_section "$profile_file" "packages")
                 if [[ ${#current_packages[@]} -gt 0 ]]; then
                     echo "Extra packages: ${current_packages[*]}"
@@ -125,14 +166,17 @@ _cmd_add() {
         fi
     done
 
-    [[ ${#selected[@]} -eq 0 ]] && error "No valid profiles specified\nRun 'claudebox profiles' to see available profiles"
+    if [[ ${#selected[@]} -eq 0 ]]; then
+        error "No valid profiles specified\nRun 'claudebox profiles' to see available profiles"
+    fi
 
     update_profile_section "$profile_file" "profiles" "${selected[@]}"
 
     local all_profiles=()
-    local all_profiles=()
     while IFS= read -r line; do
-        [[ -n "$line" ]] && all_profiles+=("$line")
+        if [[ -n "$line" ]]; then
+            all_profiles+=("$line")
+        fi
     done < <(read_profile_section "$profile_file" "profiles")
 
     cecho "Profile: $PROJECT_DIR" "$CYAN"
@@ -197,11 +241,11 @@ _cmd_remove() {
     if [[ $# -eq 0 ]]; then
         if [[ ${#current_profiles[@]} -gt 0 ]]; then
             cecho "Currently Enabled Profiles:" "$YELLOW"
-            echo -e "  ${current_profiles[*]}"
-            echo
-            echo "Usage: claudebox remove <profile1> [profile2] ..."
+            printf "  %s\n" "${current_profiles[*]}"
+            printf '\n'
+            printf '%s\n' "Usage: claudebox remove <profile1> [profile2] ..."
         else
-            echo "No profiles currently enabled."
+            printf '%s\n' "No profiles currently enabled."
         fi
         exit 1
     fi
@@ -224,7 +268,9 @@ _cmd_remove() {
         fi
     done
 
-    [[ ${#to_remove[@]} -eq 0 ]] && error "No valid profiles specified to remove"
+    if [[ ${#to_remove[@]} -eq 0 ]]; then
+        error "No valid profiles specified to remove"
+    fi
 
     # Remove specified profiles
     local new_profiles=()
@@ -241,7 +287,7 @@ _cmd_remove() {
                 break
             fi
         done
-        [[ "$keep" == "true" ]] && new_profiles+=("$profile")
+        if [[ "$keep" == "true" ]]; then new_profiles+=("$profile"); fi
     done
     
     # Check if any Python-related profiles remain
@@ -302,7 +348,9 @@ _cmd_remove() {
 }
 
 _cmd_install() {
-    [[ $# -eq 0 ]] && error "No packages specified. Usage: claudebox install <package1> <package2> ..."
+    if [[ $# -eq 0 ]]; then
+        error "No packages specified. Usage: claudebox install <package1> <package2> ..."
+    fi
 
     local profile_file
     profile_file=$(get_profile_file_path)
@@ -310,9 +358,10 @@ _cmd_install() {
     update_profile_section "$profile_file" "packages" "$@"
 
     local all_packages=()
-    local all_packages=()
     while IFS= read -r line; do
-        [[ -n "$line" ]] && all_packages+=("$line")
+        if [[ -n "$line" ]]; then
+            all_packages+=("$line")
+        fi
     done < <(read_profile_section "$profile_file" "packages")
 
     cecho "Profile: $PROJECT_DIR" "$CYAN"

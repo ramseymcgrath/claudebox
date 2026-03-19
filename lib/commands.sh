@@ -64,6 +64,23 @@ source "${LIB_DIR}/commands.clean.sh"
 source "${LIB_DIR}/commands.system.sh"
 
 # ============================================================================
+# AUTH & TUNNEL COMMANDS - Authentication and network tunnel management
+# ============================================================================
+# Commands: auth, tunnel
+# - auth: Manages persistent auth tokens across slots
+# - tunnel: Configures Cloudflare tunnel for private network access
+source "${LIB_DIR}/commands.auth.sh"
+
+# ============================================================================
+# MCP COMMANDS - MCP server installation and management
+# ============================================================================
+# Commands: mcp (install, remove, list, status)
+# - mcp install: Installs MCP servers persistently into the Docker image
+# - mcp remove: Removes MCP servers from the image
+# - mcp list: Lists known and installed MCP servers
+source "${LIB_DIR}/commands.mcp.sh"
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -122,7 +139,11 @@ show_help() {
   slots                           List all container slots
   slot <number>                   Launch a specific container slot
   project <name>                  Open project by name/hash from anywhere
-  tmux                            Launch ClaudeBox with tmux support enabled"
+  tmux                            Launch ClaudeBox with tmux support enabled
+  auth                            Manage persistent auth tokens
+  tunnel                          Configure Cloudflare tunnel access
+  mcp install <server>            Install an MCP server into the image
+  mcp list                        List known/installed MCP servers"
     
     # Check if we're in a project directory
     local project_folder_name
@@ -297,9 +318,14 @@ dispatch_command() {
         project)          _cmd_project "$@" ;;
         import)           _cmd_import "$@" ;;
         kill)             _cmd_kill "$@" ;;
+        auth)             _cmd_auth "$@" ;;
+        tunnel)           _cmd_tunnel "$@" ;;
         
+        # MCP server management
+        mcp)              _cmd_mcp "$@" ;;
+
         # Special commands that modify container
-        config|mcp|migrate-installer) 
+        config|migrate-installer)
                           _cmd_special "$cmd" "$@" ;;
         
         # Unknown command - forward to Claude in container

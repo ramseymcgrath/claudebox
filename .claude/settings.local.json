@@ -5,7 +5,20 @@
       "Bash(tmux list-windows:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(bash tests/test_bash32_compat.sh 2>&1)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.auth.sh)",
+      "Bash(printf \"auth: OK\\\\n\")",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/docker.sh)",
+      "Bash(printf \"docker: OK\\\\n\")",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/build/docker-entrypoint)",
+      "Bash(bash /Users/ramseymcgrath/code/claudebox/tests/test_bash32_compat.sh 2>&1)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.mcp.sh)",
+      "Bash(printf \"mcp: OK\\\\n\")",
+      "Bash(bash /Users/ramseymcgrath/code/claudebox/tests/test_bash32_compat.sh)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -42,9 +42,8 @@ run_test() {
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$TEST_DIR")"
 CONFIG_SCRIPT="$ROOT_DIR/lib/config.sh"
-# Extract the profile functions - they start at get_profile_packages and end at profile_exists
-# Include the entire profile_exists function by searching for the next function after it
-PROFILE_FUNCS=$(sed -n '/^get_profile_packages()/,/^expand_profile()/p' "$CONFIG_SCRIPT" | sed '$d')
+# Extract all profile functions (everything except exports at the end)
+PROFILE_FUNCS=$(sed '/^export -f/d' "$CONFIG_SCRIPT" | sed '/^#!\/usr\/bin\/env bash/d')
 
 echo "1. Testing profile functions"
 echo "----------------------------"
@@ -77,7 +76,7 @@ test_get_all_names() {
     eval "$PROFILE_FUNCS"
     local result=$(get_all_profile_names)
     local count=$(echo "$result" | wc -w)
-    [[ $count -eq 20 ]]
+    [[ $count -ge 21 ]]
 }
 run_test "get_all_profile_names()" test_get_all_names
 

@@ -241,6 +241,35 @@ run_claudebox_container() {
     
     # Mount SSH directory
     docker_args+=(-v "$HOME/.ssh":"/home/$DOCKER_USER/.ssh:ro")
+
+    # Mount persistent auth token if it exists
+    local auth_dir="$HOME/.claudebox/auth"
+    if [[ -d "$auth_dir" ]]; then
+        # Mount the credentials file directly so it persists across containers/slots
+        if [[ -f "$auth_dir/credentials.json" ]]; then
+            docker_args+=(-v "$auth_dir/credentials.json":"/home/$DOCKER_USER/.claude/.credentials.json")
+            if [[ "$VERBOSE" == "true" ]]; then
+                printf '[DEBUG] Mounting persistent auth token\n' >&2
+            fi
+        fi
+    fi
+
+    # Mount tunnel config if it exists
+    local tunnel_config="$HOME/.claudebox/tunnel.yml"
+    if [[ -f "$tunnel_config" ]]; then
+        docker_args+=(-v "$tunnel_config":"/home/$DOCKER_USER/.cloudflared/config.yml":ro)
+        if [[ "$VERBOSE" == "true" ]]; then
+            printf '[DEBUG] Mounting cloudflared tunnel config\n' >&2
+        fi
+    fi
+    # Mount cloudflared credentials if they exist
+    local cf_creds_dir="$HOME/.claudebox/cloudflared"
+    if [[ -d "$cf_creds_dir" ]]; then
+        docker_args+=(-v "$cf_creds_dir":"/home/$DOCKER_USER/.cloudflared":ro)
+        if [[ "$VERBOSE" == "true" ]]; then
+            printf '[DEBUG] Mounting cloudflared credentials directory\n' >&2
+        fi
+    fi
     
     # Mount .env file if it exists in the project directory
     if [[ -f "$PROJECT_DIR/.env" ]]; then
@@ -353,7 +382,19 @@ run_claudebox_container() {
             mv "$merged_file" "$temp_project_file"
         fi
     fi
-    
+
+    # Merge claudebox-installed MCP servers (from 'claudebox mcp install')
+    local claudebox_mcp_config="$HOME/.claudebox/mcp-config.json"
+    if [[ -f "$claudebox_mcp_config" ]]; then
+        merged_file=$(create_mcp_config_file "$claudebox_mcp_config" "$temp_project_file")
+        if [[ -n "$merged_file" ]]; then
+            mv "$merged_file" "$temp_project_file"
+            if [[ "$VERBOSE" == "true" ]]; then
+                printf '[DEBUG] Merged claudebox-installed MCP servers\n' >&2
+            fi
+        fi
+    fi
+
     # Check if we have any project servers
     local project_count=$(jq '.mcpServers | length' "$temp_project_file" 2>/dev/null || echo "0")
     if [[ "$project_count" -gt 0 ]]; then
@@ -371,6 +412,28 @@ run_claudebox_container() {
     fi
     
     
+    # Load Cloudflare Access / tunnel config from tunnel.env
+    local cf_access_hostname=""
+    local cf_access_token_id=""
+    local cf_access_token_secret=""
+    local cf_access_tcp_forward=""
+    if [[ -f "$HOME/.claudebox/tunnel.env" ]]; then
+        local _line
+        _line=$(grep '^CF_ACCESS_HOSTNAME=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then cf_access_hostname="${_line#CF_ACCESS_HOSTNAME=}"; fi
+        _line=$(grep '^CF_ACCESS_SERVICE_TOKEN_ID=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then cf_access_token_id="${_line#CF_ACCESS_SERVICE_TOKEN_ID=}"; fi
+        _line=$(grep '^CF_ACCESS_SERVICE_TOKEN_SECRET=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then cf_access_token_secret="${_line#CF_ACCESS_SERVICE_TOKEN_SECRET=}"; fi
+        _line=$(grep '^CF_ACCESS_TCP_FORWARD=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then cf_access_tcp_forward="${_line#CF_ACCESS_TCP_FORWARD=}"; fi
+        # Legacy TUNNEL_URL support
+        if [[ -z "${TUNNEL_URL:-}" ]]; then
+            _line=$(grep '^TUNNEL_URL=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
+            if [[ -n "$_line" ]]; then TUNNEL_URL="${_line#TUNNEL_URL=}"; fi
+        fi
+    fi
+
     # Add environment variables
     local project_name=$(basename "$PROJECT_DIR")
     local slot_name=$(basename "$PROJECT_SLOT_DIR")
@@ -391,6 +454,11 @@ run_claudebox_container() {
         -e "CLAUDEBOX_WRAP_TMUX=${CLAUDEBOX_WRAP_TMUX:-false}"
         -e "CLAUDEBOX_PANE_NAME=${CLAUDEBOX_PANE_NAME:-}"
         -e "CLAUDEBOX_TMUX_PANE=${CLAUDEBOX_TMUX_PANE:-}"
+        -e "TUNNEL_URL=${TUNNEL_URL:-}"
+        -e "CF_ACCESS_HOSTNAME=${cf_access_hostname}"
+        -e "CF_ACCESS_CLIENT_ID=${cf_access_token_id}"
+        -e "CF_ACCESS_CLIENT_SECRET=${cf_access_token_secret}"
+        -e "CF_ACCESS_TCP_FORWARD=${cf_access_tcp_forward}"
         --cap-add NET_ADMIN
         --cap-add NET_RAW
         "$IMAGE_NAME"

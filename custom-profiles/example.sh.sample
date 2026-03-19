@@ -1,0 +1,23 @@
+# Example Custom Profile - My custom tools
+# Rename this file to <profile-name>.sh (e.g., mytools.sh)
+# The first comment line becomes the profile description.
+#
+# This file should contain valid Dockerfile instructions.
+# Common patterns:
+#
+# Install apt packages:
+#   RUN apt-get update && apt-get install -y mypackage && apt-get clean
+#
+# Download a binary:
+#   RUN curl -fsSL https://example.com/tool.tar.gz | tar -xz -C /usr/local/bin/
+#
+# Run as the container user:
+#   USER claude
+#   RUN pip install something
+#   USER root
+#
+# Set environment variables:
+#   ENV MY_VAR="value"
+#
+# Example: install htop and ncdu
+RUN apt-get update && apt-get install -y htop ncdu && apt-get clean

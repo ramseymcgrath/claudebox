@@ -35,6 +35,7 @@ get_profile_packages() {
         datascience) echo "r-base" ;;
         security) echo "nmap tcpdump wireshark-common netcat-openbsd john hashcat hydra" ;;
         ml) echo "" ;;  # Just cmake needed, comes from build-tools now
+        tunnel) echo "" ;;  # Installed via deb package
         *) echo "" ;;
     esac
 }
@@ -73,7 +74,9 @@ get_all_profile_names() {
 profile_exists() {
     local profile="$1"
     for p in $(get_all_profile_names); do
-        [[ "$p" == "$profile" ]] && return 0
+        if [[ "$p" == "$profile" ]]; then
+            return 0
+        fi
     done
     return 1
 }
@@ -83,7 +86,7 @@ expand_profile() {
         c) echo "core build-tools c" ;;
         openwrt) echo "core build-tools openwrt" ;;
         ml) echo "core build-tools ml" ;;
-        rust|go|flutter|python|php|ruby|java|database|devops|web|embedded|datascience|security|javascript)
+        rust|go|flutter|python|php|ruby|java|database|devops|web|embedded|datascience|security|javascript|tunnel)
             echo "core $1"
             ;;
         shell|networking|build-tools|core)
@@ -125,12 +128,16 @@ read_profile_section() {
 
     if [[ -f "$profile_file" ]] && grep -q "^\[$section\]" "$profile_file"; then
         while IFS= read -r line; do
-            [[ -z "$line" || "$line" =~ ^\[.*\]$ ]] && break
+            if [[ -z "$line" ]] || [[ "$line" =~ ^\[.*\]$ ]]; then
+                break
+            fi
             result+=("$line")
         done < <(sed -n "/^\[$section\]/,/^\[/p" "$profile_file" | tail -n +2 | grep -v '^\[')
     fi
 
-    printf '%s\n' "${result[@]}"
+    if [[ ${#result[@]} -gt 0 ]]; then
+        printf '%s\n' "${result[@]}"
+    fi
 }
 
 update_profile_section() {
@@ -140,19 +147,34 @@ update_profile_section() {
     local new_items=("$@")
 
     local existing_items=()
-    readarray -t existing_items < <(read_profile_section "$profile_file" "$section")
+    while IFS= read -r line; do
+        if [[ -n "$line" ]]; then
+            existing_items+=("$line")
+        fi
+    done < <(read_profile_section "$profile_file" "$section")
 
     local all_items=()
-    for item in "${existing_items[@]}"; do
-        [[ -n "$item" ]] && all_items+=("$item")
-    done
+    if [[ ${#existing_items[@]} -gt 0 ]]; then
+        for item in "${existing_items[@]}"; do
+            if [[ -n "$item" ]]; then
+                all_items+=("$item")
+            fi
+        done
+    fi
 
     for item in "${new_items[@]}"; do
         local found=false
-        for existing in "${all_items[@]}"; do
-            [[ "$existing" == "$item" ]] && found=true && break
-        done
-        [[ "$found" == "false" ]] && all_items+=("$item")
+        if [[ ${#all_items[@]} -gt 0 ]]; then
+            for existing in "${all_items[@]}"; do
+                if [[ "$existing" == "$item" ]]; then
+                    found=true
+                    break
+                fi
+            done
+        fi
+        if [[ "$found" == "false" ]]; then
+            all_items+=("$item")
+        fi
     done
 
     {
@@ -179,14 +201,18 @@ update_profile_section() {
 get_current_profiles() {
     local profiles_file="${PROJECT_PARENT_DIR:-$HOME/.claudebox/projects/$(generate_parent_folder_name "$PWD")}/profiles.ini"
     local current_profiles=()
-    
+
     if [[ -f "$profiles_file" ]]; then
         while IFS= read -r line; do
-            [[ -n "$line" ]] && current_profiles+=("$line")
+            if [[ -n "$line" ]]; then
+                current_profiles+=("$line")
+            fi
         done < <(read_profile_section "$profiles_file" "profiles")
     fi
-    
-    printf '%s\n' "${current_profiles[@]}"
+
+    if [[ ${#current_profiles[@]} -gt 0 ]]; then
+        printf '%s\n' "${current_profiles[@]}"
+    fi
 }
 
 # -------- Profile installation functions for Docker builds -------------------
@@ -362,7 +388,146 @@ get_profile_security() {
 
 get_profile_ml() {
     # ML profile just needs build tools which are dependencies
-    echo "# ML profile uses build-tools for compilation"
+    printf '%s\n' "# ML profile uses build-tools for compilation"
+}
+
+get_profile_tunnel() {
+    cat << 'EOF'
+# Install cloudflared for Cloudflare Tunnel access
+RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb && \
+    dpkg -i /tmp/cloudflared.deb && \
+    rm -f /tmp/cloudflared.deb
+EOF
+}
+
+# -------- Custom profile support -----------------------------------------------
+# Users can add custom profiles as shell scripts in ~/.claudebox/custom-profiles/
+# Each file should be named <profile-name>.sh and contain a function body that
+# outputs Dockerfile RUN instructions (same format as get_profile_* functions).
+# Example: ~/.claudebox/custom-profiles/mytools.sh
+#   RUN apt-get update && apt-get install -y mypackage && apt-get clean
+
+get_custom_profile_names() {
+    local custom_dir="$HOME/.claudebox/custom-profiles"
+    if [[ -d "$custom_dir" ]]; then
+        for f in "$custom_dir"/*.sh; do
+            if [[ -f "$f" ]]; then
+                local name
+                name=$(basename "$f" .sh)
+                printf '%s ' "$name"
+            fi
+        done
+    fi
+}
+
+custom_profile_exists() {
+    local profile="$1"
+    local custom_dir="$HOME/.claudebox/custom-profiles"
+    [[ -f "$custom_dir/${profile}.sh" ]]
+}
+
+get_custom_profile() {
+    local profile="$1"
+    local custom_dir="$HOME/.claudebox/custom-profiles"
+    local profile_file="$custom_dir/${profile}.sh"
+    if [[ -f "$profile_file" ]]; then
+        cat "$profile_file"
+    fi
+}
+
+get_custom_profile_description() {
+    local profile="$1"
+    local custom_dir="$HOME/.claudebox/custom-profiles"
+    local profile_file="$custom_dir/${profile}.sh"
+    if [[ -f "$profile_file" ]]; then
+        # First line starting with # is the description
+        local desc
+        desc=$(head -1 "$profile_file" | sed 's/^#[[:space:]]*//')
+        if [[ -n "$desc" ]] && [[ "$desc" != "$(head -1 "$profile_file")" ]]; then
+            printf '%s' "$desc"
+        else
+            printf 'Custom profile: %s' "$profile"
+        fi
+    fi
+}
+
+# Override profile_exists to also check custom profiles
+_builtin_profile_exists() {
+    local profile="$1"
+    for p in $(get_all_profile_names); do
+        if [[ "$p" == "$profile" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Re-define profile_exists to check both built-in and custom
+profile_exists() {
+    local profile="$1"
+    if _builtin_profile_exists "$profile"; then
+        return 0
+    fi
+    if custom_profile_exists "$profile"; then
+        return 0
+    fi
+    return 1
+}
+
+# Override get_all_profile_names to include custom profiles
+_builtin_profile_names() {
+    printf '%s' "core build-tools shell networking c openwrt rust python go flutter javascript java ruby php database devops web embedded datascience security ml tunnel"
+}
+
+get_all_profile_names() {
+    local names
+    names=$(_builtin_profile_names)
+    local custom
+    custom=$(get_custom_profile_names)
+    if [[ -n "$custom" ]]; then
+        printf '%s %s' "$names" "$custom"
+    else
+        printf '%s' "$names"
+    fi
+}
+
+# Override get_profile_description to handle custom profiles
+_builtin_profile_description() {
+    case "$1" in
+        core) printf '%s' "Core Development Utilities (compilers, VCS, shell tools)" ;;
+        build-tools) printf '%s' "Build Tools (CMake, autotools, Ninja)" ;;
+        shell) printf '%s' "Optional Shell Tools (fzf, SSH, man, rsync, file)" ;;
+        networking) printf '%s' "Network Tools (IP stack, DNS, route tools)" ;;
+        c) printf '%s' "C/C++ Development (debuggers, analyzers, Boost, ncurses, cmocka)" ;;
+        openwrt) printf '%s' "OpenWRT Development (cross toolchain, QEMU, distro tools)" ;;
+        rust) printf '%s' "Rust Development (installed via rustup)" ;;
+        python) printf '%s' "Python Development (managed via uv)" ;;
+        go) printf '%s' "Go Development (installed from upstream archive)" ;;
+        flutter) printf '%s' "Flutter Development (installed from fvm)" ;;
+        javascript) printf '%s' "JavaScript/TypeScript (Node installed via nvm)" ;;
+        java) printf '%s' "Java Development (latest LTS, Maven, Gradle, Ant via SDKMan)" ;;
+        ruby) printf '%s' "Ruby Development (gems, native deps, XML/YAML)" ;;
+        php) printf '%s' "PHP Development (PHP + extensions + Composer)" ;;
+        database) printf '%s' "Database Tools (clients for major databases)" ;;
+        devops) printf '%s' "DevOps Tools (Docker, Kubernetes, Terraform, etc.)" ;;
+        web) printf '%s' "Web Dev Tools (nginx, HTTP test clients)" ;;
+        embedded) printf '%s' "Embedded Dev (ARM toolchain, serial debuggers)" ;;
+        datascience) printf '%s' "Data Science (Python, Jupyter, R)" ;;
+        security) printf '%s' "Security Tools (scanners, crackers, packet tools)" ;;
+        ml) printf '%s' "Machine Learning (build layer only; Python via uv)" ;;
+        tunnel) printf '%s' "Cloudflare Tunnel (cloudflared for private network access)" ;;
+        *) printf '' ;;
+    esac
+}
+
+get_profile_description() {
+    local desc
+    desc=$(_builtin_profile_description "$1")
+    if [[ -n "$desc" ]]; then
+        printf '%s' "$desc"
+    else
+        get_custom_profile_description "$1"
+    fi
 }
 
 export -f _read_ini get_profile_packages get_profile_description get_all_profile_names profile_exists expand_profile
@@ -370,4 +535,6 @@ export -f get_profile_file_path read_config_value read_profile_section update_pr
 export -f get_profile_core get_profile_build_tools get_profile_shell get_profile_networking get_profile_c get_profile_openwrt
 export -f get_profile_rust get_profile_python get_profile_go get_profile_flutter get_profile_javascript get_profile_java get_profile_ruby
 export -f get_profile_php get_profile_database get_profile_devops get_profile_web get_profile_embedded get_profile_datascience
-export -f get_profile_security get_profile_ml
+export -f get_profile_security get_profile_ml get_profile_tunnel
+export -f get_custom_profile_names custom_profile_exists get_custom_profile get_custom_profile_description
+export -f _builtin_profile_exists _builtin_profile_names _builtin_profile_description

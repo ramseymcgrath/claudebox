@@ -403,6 +403,15 @@ main() {
     if [[ ! -d "$HOME/.claudebox" ]]; then
         mkdir -p "$HOME/.claudebox"
     fi
+    # Ensure custom-profiles directory exists
+    if [[ ! -d "$HOME/.claudebox/custom-profiles" ]]; then
+        mkdir -p "$HOME/.claudebox/custom-profiles"
+        # Copy example if available
+        local example_file="$SCRIPT_DIR/custom-profiles/example.sh.sample"
+        if [[ -f "$example_file" ]]; then
+            cp "$example_file" "$HOME/.claudebox/custom-profiles/example.sh.sample"
+        fi
+    fi
     if [[ ! -w "$HOME/.claudebox" ]]; then
         warn "Fixing .claudebox permissions..."
         sudo chown -R "$USER:$USER" "$HOME/.claudebox" || true
@@ -538,13 +547,17 @@ build_docker_image() {
         
         # Generate profile installations
         for profile in "${current_profiles[@]}"; do
-            profile=$(echo "$profile" | tr -d '[:space:]')
-            [[ -z "$profile" ]] && continue
-            
+            profile=$(printf '%s' "$profile" | tr -d '[:space:]')
+            if [[ -z "$profile" ]]; then
+                continue
+            fi
+
             # Convert hyphens to underscores for function names
             local profile_fn="get_profile_${profile//-/_}"
             if type -t "$profile_fn" >/dev/null; then
                 profile_installations+=$'\n'"$($profile_fn)"
+            elif custom_profile_exists "$profile"; then
+                profile_installations+=$'\n'"$(get_custom_profile "$profile")"
             fi
         done
         
@@ -600,8 +613,8 @@ LABEL claudebox.project=\"$project_folder_name\""
     ' <<<"$base_dockerfile") || error "Failed to apply Dockerfile substitutions"
 
     # Guard: ensure no unreplaced placeholders remain
-    if grep -q '{{PROFILE_INSTALLATIONS}}' <<<"$final_dockerfile" grep -q '{{LABELS}}' <<<"$final_dockerfile"; then
-    error "Unreplaced placeholders remain in generated Dockerfile"
+    if grep -q '{{PROFILE_INSTALLATIONS}}' <<<"$final_dockerfile" || grep -q '{{LABELS}}' <<<"$final_dockerfile"; then
+        error "Unreplaced placeholders remain in generated Dockerfile"
     fi
 
     printf '%s' "$final_dockerfile" > "$dockerfile"
