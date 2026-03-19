@@ -545,9 +545,15 @@ Current directory: $PWD"
                         fi
                     done
                     
+                    # Start background health monitor
+                    local monitor_slots=()
+                    for ((i=0; i<${#available_slots[@]} && i<$layout; i++)); do
+                        monitor_slots+=("$(generate_container_name "$PROJECT_DIR" "${available_slots[$i]}")")
+                    done
+                    _start_tmux_health_monitor "$session_name" "${monitor_slots[@]}"
+
                     # Attach to the session
                     tmux attach-session -t "$session_name"
-                    
 
                     exit 0
                 else
@@ -658,9 +664,16 @@ Current directory: $PWD"
                         fi
                     done
                     
+                    # Start background health monitor
+                    local monitor_slots=()
+                    for ((i=0; i<slot_index; i++)); do
+                        monitor_slots+=("$(generate_container_name "$PROJECT_DIR" "${available_slots[$i]}")")
+                    done
+                    _start_tmux_health_monitor "$session_name" "${monitor_slots[@]}"
+
                     # Attach to the session
                     tmux attach-session -t "$session_name"
-                    
+
                     exit 0
                 fi
         else
@@ -863,6 +876,47 @@ _cmd_import() {
     ls -la "$project_commands"
 }
 
+# Start a background health monitor for tmux containers
+# Checks container health every 30s, shows tmux notifications on failure
+_start_tmux_health_monitor() {
+    local session_name="$1"
+    shift
+    local slot_names=("$@")
+
+    # Launch monitor as a background process (disable set -e for resilience)
+    (
+        set +e
+        while tmux has-session -t "$session_name" 2>/dev/null; do
+            for sname in "${slot_names[@]}"; do
+                # Check if container is running by grepping docker ps output
+                local cname
+                cname=$(docker ps --format "{{.Names}}" 2>/dev/null | grep -- "-${sname}$" | head -1)
+
+                if [[ -z "$cname" ]]; then
+                    # Container gone — check if it exited recently
+                    local exit_info
+                    exit_info=$(docker ps -a --format "{{.Names}} {{.Status}}" 2>/dev/null | grep -- "-${sname} " | head -1)
+                    if [[ -n "$exit_info" ]]; then
+                        # Extract exit code from status like "Exited (137)"
+                        local code
+                        code=$(printf '%s' "$exit_info" | grep -o '([0-9]*)' | tr -d '()')
+                        if [[ -z "$code" ]]; then
+                            code="?"
+                        fi
+                        if [[ "$code" == "137" ]]; then
+                            tmux display-message -t "$session_name" "Slot $sname OOM killed — try: claudebox vm set --container-memory 2048m" 2>/dev/null
+                        elif [[ "$code" != "0" ]] && [[ "$code" != "?" ]]; then
+                            tmux display-message -t "$session_name" "Slot $sname exited (code $code)" 2>/dev/null
+                        fi
+                    fi
+                fi
+            done
+            sleep 30
+        done
+    ) &
+    disown
+}
+
 _install_tmux_conf() {
     local tmux_conf_template="${SCRIPT_DIR}/templates/tmux.conf"
     local user_tmux_conf="$HOME/.tmux.conf"
@@ -938,4 +992,4 @@ _install_tmux_conf() {
     fi
 }
 
-export -f _cmd_save _cmd_unlink _cmd_rebuild _cmd_tmux _cmd_project _cmd_special _cmd_import _install_tmux_conf _cmd_kill
+export -f _cmd_save _cmd_unlink _cmd_rebuild _cmd_tmux _cmd_project _cmd_special _cmd_import _install_tmux_conf _cmd_kill _start_tmux_health_monitor

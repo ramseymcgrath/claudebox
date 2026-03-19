@@ -19,7 +19,18 @@
       "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.mcp.sh)",
       "Bash(printf \"mcp: OK\\\\n\")",
       "Bash(bash /Users/ramseymcgrath/code/claudebox/tests/test_bash32_compat.sh)",
-      "Bash(head -30 /Users/ramseymcgrath/code/claudebox/commands/cbox/*.md)"
+      "Bash(head -30 /Users/ramseymcgrath/code/claudebox/commands/cbox/*.md)",
+      "Bash(shellcheck --shell=bash --severity=error lib/commands.doctor.sh lib/commands.snapshot.sh)",
+      "Bash(command -v shellcheck)",
+      "Bash(brew list:*)",
+      "Bash(printf 'shellcheck not available')",
+      "Bash(bash -n main.sh)",
+      "Bash(printf 'main.sh: syntax OK\\\\n')",
+      "Bash(for f:*)",
+      "Bash(do bash:*)",
+      "Bash(printf '%s: syntax OK\\\\n' \"$f\")",
+      "Bash(printf '%s: SYNTAX ERROR\\\\n' \"$f\")",
+      "Bash(done)"
     ]
   },
   "enableAllProjectMcpServers": true,

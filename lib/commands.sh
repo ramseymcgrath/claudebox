@@ -97,6 +97,23 @@ source "${LIB_DIR}/commands.setup.sh"
 source "${LIB_DIR}/commands.mcp.sh"
 
 # ============================================================================
+# DOCTOR COMMAND - Comprehensive diagnostic checks
+# ============================================================================
+# Commands: doctor
+# - doctor: Runs health checks on Docker, images, slots, disk, and version
+source "${LIB_DIR}/commands.doctor.sh"
+
+# ============================================================================
+# SNAPSHOT COMMANDS - Save and restore slot state
+# ============================================================================
+# Commands: snapshot [name], snapshot list, snapshot restore, snapshot export
+# - snapshot: Creates a tarball of slot state (.claude/, profiles, resources)
+# - snapshot list: Lists saved snapshots
+# - snapshot restore: Restores a snapshot to a slot
+# - snapshot export: Copies a snapshot to current directory
+source "${LIB_DIR}/commands.snapshot.sh"
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -162,7 +179,11 @@ show_help() {
   auth                            Manage persistent auth tokens
   tunnel                          Configure Cloudflare tunnel access
   mcp install <server>            Install an MCP server into the image
-  mcp list                        List known/installed MCP servers"
+  mcp list                        List known/installed MCP servers
+  doctor                          Run diagnostic health checks
+  snapshot [name]                 Save current slot state
+  snapshot list                   List saved snapshots
+  snapshot restore <name>         Restore a snapshot to a slot"
     
     # Check if we're in a project directory
     local project_folder_name
@@ -274,7 +295,10 @@ show_full_help() {
   slots                           List all container slots\
   slot <number>                   Launch a specific container slot\
   project <name>                  Open project by name/hash from anywhere\
-  tmux                            Launch ClaudeBox with tmux support enabled')
+  tmux                            Launch ClaudeBox with tmux support enabled\
+  doctor                          Run diagnostic health checks\
+  snapshot [name]                 Save current slot state\
+  snapshot restore <name>         Restore a snapshot to a slot')
         
         # Output everything at once
         echo
@@ -354,6 +378,10 @@ dispatch_command() {
 
         # MCP server management
         mcp)              _cmd_mcp "$@" ;;
+
+        # Doctor and snapshot commands
+        doctor)           _cmd_doctor "$@" ;;
+        snapshot)         _cmd_snapshot "$@" ;;
 
         # Special commands that modify container
         config|migrate-installer)

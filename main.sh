@@ -97,7 +97,10 @@ main() {
     
     # Step 1: Update symlink
     update_symlink
-    
+
+    # Step 1a: Non-blocking update check (at most once per 24h)
+    check_for_updates
+
     # Step 2: Parse ALL arguments
     parse_cli_args "$@"
     
@@ -587,26 +590,39 @@ LABEL claudebox.profiles=\"$profile_hash\"
 LABEL claudebox.profiles.crc=\"$profiles_file_hash\"
 LABEL claudebox.project=\"$project_folder_name\""
     
-    # Replace placeholders in the project template
-    local final_dockerfile="$base_dockerfile"
-    
-    # Replace WHOLE lines that contain the placeholders (with optional spaces)
-    local final_dockerfile
-    final_dockerfile=$(awk -v pi="$profile_installations" -v lbs="$labels" '
-    # If the whole line is {{ PROFILE_INSTALLATIONS }}, print injected block and skip
-    /^[[:space:]]*\{\{[[:space:]]*PROFILE_INSTALLATIONS[[:space:]]*\}\}[[:space:]]*$/ { print pi; next }
-    # If the whole line is {{ LABELS }}, print labels block and skip
-    /^[[:space:]]*\{\{[[:space:]]*LABELS[[:space:]]*\}\}[[:space:]]*$/ { print lbs; next }
-    # Otherwise, print the line unchanged
-    { print }
-    ' <<<"$base_dockerfile") || error "Failed to apply Dockerfile substitutions"
+    # Replace placeholders using temp files to preserve backslashes in RUN commands.
+    # awk -v interprets \n, \t, \\ as escape sequences, corrupting Dockerfile content.
+    # sed r command reads from file verbatim — no escape interpretation.
+    printf '%s' "$profile_installations" > "$build_context/.tmp_profiles"
+    printf '%s' "$labels" > "$build_context/.tmp_labels"
+
+    # Write the base template, then use sed to replace placeholder lines
+    printf '%s\n' "$base_dockerfile" > "$build_context/.tmp_base"
+
+    # Use sed with a script file for BSD/GNU portability.
+    # BSD sed requires r filename on its own line and does not support {r;d} grouping.
+    local sed_script_file="$build_context/.tmp_sed"
+    cat > "$sed_script_file" <<SEDEOF
+/^[[:space:]]*{{[[:space:]]*PROFILE_INSTALLATIONS[[:space:]]*}}[[:space:]]*\$/{
+r $build_context/.tmp_profiles
+d
+}
+/^[[:space:]]*{{[[:space:]]*LABELS[[:space:]]*}}[[:space:]]*\$/{
+r $build_context/.tmp_labels
+d
+}
+SEDEOF
+
+    sed -f "$sed_script_file" "$build_context/.tmp_base" > "$dockerfile"
+    rm -f "$sed_script_file"
 
     # Guard: ensure no unreplaced placeholders remain
-    if grep -q '{{PROFILE_INSTALLATIONS}}' <<<"$final_dockerfile" || grep -q '{{LABELS}}' <<<"$final_dockerfile"; then
+    if grep -q '{{.*PROFILE_INSTALLATIONS.*}}' "$dockerfile" || grep -q '{{.*LABELS.*}}' "$dockerfile"; then
         error "Unreplaced placeholders remain in generated Dockerfile"
     fi
 
-    printf '%s' "$final_dockerfile" > "$dockerfile"
+    # Clean up temp files
+    rm -f "$build_context/.tmp_profiles" "$build_context/.tmp_labels" "$build_context/.tmp_base"
     
     # Build the image
     run_docker_build "$dockerfile" "$build_context"

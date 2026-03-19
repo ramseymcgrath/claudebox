@@ -270,4 +270,45 @@ save_docker_layer_checksums() {
     fi
 }
 
-export -f update_symlink setup_shared_commands setup_claude_agent_command calculate_docker_layer_checksums needs_docker_rebuild save_docker_layer_checksums
+# Check for updates (non-blocking, at most once per 24h)
+check_for_updates() {
+    local check_file="${CLAUDEBOX_HOME}/.last_update_check"
+    local now
+    now=$(date +%s)
+
+    # Skip if checked within 24 hours
+    if [[ -f "$check_file" ]]; then
+        local last_check
+        last_check=$(cat "$check_file" 2>/dev/null || printf '0')
+        local diff=$((now - last_check))
+        if [[ $diff -lt 86400 ]]; then
+            return 0
+        fi
+    fi
+
+    # Save timestamp immediately to avoid repeated checks
+    mkdir -p "$CLAUDEBOX_HOME"
+    printf '%s' "$now" > "$check_file"
+
+    # Non-blocking: fetch version in background, write to temp file
+    local tmp_ver="${CLAUDEBOX_HOME}/.update_check_result"
+    (
+        curl -sS --max-time 5 "https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/main.sh" 2>/dev/null \
+            | grep -m1 'readonly CLAUDEBOX_VERSION=' \
+            | sed 's/.*"\(.*\)".*/\1/' \
+            > "$tmp_ver" 2>/dev/null
+    ) &
+
+    # Don't wait — the result will be shown on next run if available
+    # Check if there's a result from a previous background check
+    if [[ -f "$tmp_ver" ]]; then
+        local latest
+        latest=$(cat "$tmp_ver" 2>/dev/null || printf '')
+        rm -f "$tmp_ver"
+        if [[ -n "$latest" ]] && [[ "$latest" != "$CLAUDEBOX_VERSION" ]]; then
+            printf "  ${CYAN}Update available: v%s -> v%s${NC} ${DIM}(run: claudebox update all)${NC}\n" "$CLAUDEBOX_VERSION" "$latest" >&2
+        fi
+    fi
+}
+
+export -f update_symlink setup_shared_commands setup_claude_agent_command calculate_docker_layer_checksums needs_docker_rebuild save_docker_layer_checksums check_for_updates
