@@ -18,7 +18,8 @@
       "WebFetch(domain:github.com)",
       "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.mcp.sh)",
       "Bash(printf \"mcp: OK\\\\n\")",
-      "Bash(bash /Users/ramseymcgrath/code/claudebox/tests/test_bash32_compat.sh)"
+      "Bash(bash /Users/ramseymcgrath/code/claudebox/tests/test_bash32_compat.sh)",
+      "Bash(head -30 /Users/ramseymcgrath/code/claudebox/commands/cbox/*.md)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -75,7 +75,7 @@ show_next_steps() {
     echo -e "     ${WHITE}2.${NC} Or explore available options:"
     echo -e "        ${GREEN}claudebox help${NC}"
     echo
-    echo -e "${DIM}  For more information, visit: https://github.com/RchGrav/claudebox${NC}"
+    echo -e "${DIM}  For more information, visit: https://github.com/ramseymcgrath/claudebox${NC}"
     echo
 }
 

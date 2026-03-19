@@ -461,8 +461,21 @@ run_claudebox_container() {
         -e "CF_ACCESS_TCP_FORWARD=${cf_access_tcp_forward}"
         --cap-add NET_ADMIN
         --cap-add NET_RAW
-        "$IMAGE_NAME"
     )
+
+    # Apply container resource limits
+    local resource_args
+    while IFS= read -r arg; do
+        if [[ -n "$arg" ]]; then
+            docker_args+=("$arg")
+        fi
+    done < <(get_container_resource_args)
+
+    if [[ "$VERBOSE" == "true" ]]; then
+        printf '[DEBUG] Container limits: memory=%s cpus=%s\n' "$(get_container_memory)" "$(get_container_cpus)" >&2
+    fi
+
+    docker_args+=("$IMAGE_NAME")
     
     # Add any additional arguments
     if [[ ${#container_args[@]} -gt 0 ]]; then

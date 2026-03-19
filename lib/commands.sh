@@ -72,6 +72,22 @@ source "${LIB_DIR}/commands.system.sh"
 source "${LIB_DIR}/commands.auth.sh"
 
 # ============================================================================
+# AGENT COMMANDS - Plugin and agent management
+# ============================================================================
+# Commands: agent
+# - agent: Manages Claude Code plugins and ClaudeBox command agents
+# - Wraps the native plugin system for ephemeral container persistence
+source "${LIB_DIR}/commands.agent.sh"
+
+# ============================================================================
+# SETUP COMMANDS - Interactive setup wizard
+# ============================================================================
+# Commands: setup
+# - setup: Interactive wizard for first-time configuration
+# Note: Must be loaded after commands.agent.sh (setup wizard uses _agent_run_in_container)
+source "${LIB_DIR}/commands.setup.sh"
+
+# ============================================================================
 # MCP COMMANDS - MCP server installation and management
 # ============================================================================
 # Commands: mcp (install, remove, list, status)
@@ -123,7 +139,10 @@ show_help() {
     local footer="${2:-}"
     
     # ClaudeBox specific commands
-    local our_commands="  profiles                        List all available profiles
+    local our_commands="  setup                           Interactive setup wizard
+  vm                              VM and resource management
+  agent                           Plugin and agent management
+  profiles                        List all available profiles
   projects                        List all projects with paths
   add <profiles...>               Add development profiles
   remove <profiles...>            Remove development profiles
@@ -236,6 +255,9 @@ show_full_help() {
   --disable-firewall               Disable network restrictions\
 ' | \
             sed '$ a\
+  setup                           Interactive setup wizard\
+  vm                              VM and resource management\
+  agent                           Plugin and agent management\
   profiles                        List all available profiles\
   projects                        List all projects with paths\
   add <profiles...>               Add development profiles\
@@ -321,6 +343,15 @@ dispatch_command() {
         auth)             _cmd_auth "$@" ;;
         tunnel)           _cmd_tunnel "$@" ;;
         
+        # VM management
+        vm)               _cmd_vm "$@" ;;
+
+        # Setup wizard
+        setup)            _cmd_setup "$@" ;;
+
+        # Agent & plugin management
+        agent)            _cmd_agent "$@" ;;
+
         # MCP server management
         mcp)              _cmd_mcp "$@" ;;
 

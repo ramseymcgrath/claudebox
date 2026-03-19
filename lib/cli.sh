@@ -82,12 +82,23 @@ get_command_requirements() {
     
     case "$cmd" in
         # Pure host commands - no Docker or image needed
-        profiles|projects|help|-h|--help|slots|create|revoke|clean|import|unlink|kill|auth|tunnel)
+        profiles|projects|help|-h|--help|slots|create|revoke|clean|import|unlink|kill|auth|tunnel|setup|vm)
             echo "none"
             ;;
         # Commands that need image name but not Docker
         info|profile|add|remove|install|allowlist|save)
             echo "image"
+            ;;
+        # Agent subcommands: list/popular/search are host-side; install/remove/browse need Docker
+        agent)
+            case "$subcommand" in
+                list|ls|popular|recommended|search|sync|""|marketplace|market)
+                    echo "none"
+                    ;;
+                *)
+                    echo "docker"
+                    ;;
+            esac
             ;;
         # MCP subcommands: install/remove/list/status are host-side; others need Docker
         mcp)

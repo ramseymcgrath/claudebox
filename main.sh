@@ -44,33 +44,47 @@ export VERBOSE=false
 LIB_DIR="${SCRIPT_DIR}/lib"
 
 # Load libraries in order - cli.sh must be loaded first for parsing
-for lib in cli common env os state project docker config commands welcome preflight; do
+for lib in cli common env os colima state project docker config commands welcome preflight; do
     # shellcheck disable=SC1090
     source "${LIB_DIR}/${lib}.sh"
 done
 
-# Show first-time welcome message
+# Show first-time welcome message and offer setup wizard
 show_first_time_welcome() {
     logo_small
     printf '\n'
     cecho "Welcome to ClaudeBox!" "$CYAN"
     printf '\n'
-    printf '%s\n' "ClaudeBox is ready to use. Here's how to get started:"
+    printf "  ${DIM}ClaudeBox provides a secure, containerized environment for running${NC}\n"
+    printf "  ${DIM}Claude CLI with full development tooling and network isolation.${NC}\n"
     printf '\n'
-    printf '%s\n' "1. Navigate to your project directory:"
-    printf "   ${CYAN}%s${NC}\n" "cd /path/to/your/project"
-    printf '\n'
-    printf '%s\n' "2. Create your first container slot:"
-    printf "   ${CYAN}%s${NC}\n" "claudebox create"
-    printf '\n'
-    printf '%s\n' "3. Launch Claude:"
-    printf "   ${CYAN}%s${NC}\n" "claudebox"
-    printf '\n'
-    printf '%s\n' "Other useful commands:"
-    printf "  ${CYAN}%-20s${NC} - %s\n" "claudebox help" "Show all available commands"
-    printf "  ${CYAN}%-20s${NC} - %s\n" "claudebox profiles" "List available development profiles"
-    printf "  ${CYAN}%-20s${NC} - %s\n" "claudebox projects" "List all ClaudeBox projects"
-    printf '\n'
+
+    printf "  Would you like to run the setup wizard? [Y/n] "
+    local answer
+    IFS= read -r answer 2>/dev/null || true
+    answer="${answer:-y}"
+
+    case "$answer" in
+        [yY]|[yY][eE][sS])
+            _cmd_setup
+            ;;
+        *)
+            printf '\n'
+            printf '%s\n' "  No problem! Here's how to get started manually:"
+            printf '\n'
+            printf '%s\n' "  1. Navigate to your project directory:"
+            printf "     ${CYAN}%s${NC}\n" "cd /path/to/your/project"
+            printf '\n'
+            printf '%s\n' "  2. Create your first container slot:"
+            printf "     ${CYAN}%s${NC}\n" "claudebox create"
+            printf '\n'
+            printf '%s\n' "  3. Launch Claude:"
+            printf "     ${CYAN}%s${NC}\n" "claudebox"
+            printf '\n'
+            printf "  ${DIM}Run 'claudebox setup' anytime to use the wizard.${NC}\n"
+            printf '\n'
+            ;;
+    esac
 }
 
 # -------------------------------------------------------------------- main() --
@@ -141,33 +155,8 @@ main() {
         exit $?
     fi
     
-    # Step 5: Docker checks
-    local docker_status
-    docker_status=$(check_docker; echo $?)
-    case $docker_status in
-        1) install_docker ;;
-        2)
-            warn "Docker is installed but not running."
-            case "$(uname -s)" in
-                Darwin)
-                    error "Docker Desktop is not running. Please start Docker Desktop from Applications."
-                    ;;
-                Linux)
-                    warn "Starting Docker requires sudo privileges..."
-                    sudo systemctl start docker
-                    docker info || error "Failed to start Docker"
-                    docker ps || configure_docker_nonroot
-                    ;;
-                *)
-                    error "Unsupported OS: $(uname -s)"
-                    ;;
-            esac
-            ;;
-        3)
-            warn "Docker requires sudo. Setting up non-root access..."
-            configure_docker_nonroot
-            ;;
-    esac
+    # Step 5: Ensure Docker is available (auto-manages Colima on macOS)
+    ensure_docker_running
     
     # Step 5a: Build core image if it doesn't exist
     local core_image="claudebox-core"

@@ -142,9 +142,9 @@ _cmd_update() {
         # Update claudebox script
         info "Updating claudebox script..."
         if command -v curl >/dev/null 2>&1; then
-            curl -fsSL https://raw.githubusercontent.com/RchGrav/claudebox/main/claudebox -o /tmp/claudebox.new
+            curl -fsSL https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/claudebox -o /tmp/claudebox.new
         elif command -v wget >/dev/null 2>&1; then
-            wget -qO /tmp/claudebox.new https://raw.githubusercontent.com/RchGrav/claudebox/main/claudebox
+            wget -qO /tmp/claudebox.new https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/claudebox
         else
             error "Neither curl nor wget found"
         fi
@@ -206,9 +206,9 @@ _cmd_update() {
         for cmd in taskengine devops; do
             echo -n "  Updating $cmd.md... "
             if command -v curl >/dev/null 2>&1; then
-                curl -fsSL "https://raw.githubusercontent.com/RchGrav/claudebox/main/commands/$cmd.md" -o "$commands_dir/$cmd.md"
+                curl -fsSL "https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/commands/$cmd.md" -o "$commands_dir/$cmd.md"
             else
-                wget -qO "$commands_dir/$cmd.md" "https://raw.githubusercontent.com/RchGrav/claudebox/main/commands/$cmd.md"
+                wget -qO "$commands_dir/$cmd.md" "https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/commands/$cmd.md"
             fi
             echo "✓"
         done

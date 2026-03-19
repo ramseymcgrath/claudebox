@@ -9,13 +9,13 @@ Docker-based development environment for [Claude Code](https://docs.anthropic.co
 
 ```bash
 # Self-extracting installer
-wget https://github.com/RchGrav/claudebox/releases/latest/download/claudebox.run
+wget https://github.com/ramseymcgrath/claudebox/releases/latest/download/claudebox.run
 chmod +x claudebox.run && ./claudebox.run
 ```
 
 Or clone and run directly:
 ```bash
-git clone https://github.com/RchGrav/claudebox.git
+git clone https://github.com/ramseymcgrath/claudebox.git
 cd claudebox && ./main.sh
 ```
 
@@ -96,6 +96,40 @@ Installed servers persist across container restarts. Their configs are automatic
 
 **Known servers:** filesystem, memory, fetch, brave-search, github, gitlab, google-maps, slack, postgres, sqlite, puppeteer, sequential-thinking, git, time, everything, context7, datadog, aws-kb, sentry, linear.
 
+## VM & Resources
+
+ClaudeBox auto-manages [Colima](https://github.com/abiosoft/colima) as a lightweight Docker VM. If Docker isn't running when you launch ClaudeBox, it will install and start Colima with sensible resource defaults (half your CPUs/RAM).
+
+```bash
+claudebox vm status                        # Show VM and resource info
+claudebox vm set --memory 8192 --cpus 4    # Resize VM (MB for memory)
+claudebox vm set --max-containers 2        # Limit concurrency
+claudebox vm set --container-memory 2048m  # Per-container memory cap
+claudebox vm start                         # Manually start VM
+claudebox vm stop                          # Stop VM
+claudebox vm reset                         # Reset to auto-detected defaults
+```
+
+Every container gets automatic memory and CPU limits based on VM size and expected concurrency. This prevents OOM kills when running multiple slots in tmux.
+
+## Plugins & Agents
+
+Manage Claude Code plugins from the host. Plugins persist across container restarts and can be synced across slots.
+
+```bash
+claudebox agent popular                    # See recommended plugins
+claudebox agent install commit-commands    # Install a plugin
+claudebox agent install github             # GitHub integration
+claudebox agent install typescript-lsp     # TypeScript intelligence
+claudebox agent search security            # Search available plugins
+claudebox agent browse                     # Interactive plugin browser
+claudebox agent list                       # Show installed plugins
+claudebox agent sync                       # Sync plugins across all slots
+claudebox agent marketplace add owner/repo # Add community marketplace
+```
+
+100+ plugins available from the official Anthropic marketplace including LSP servers, integrations (GitHub, Slack, Linear, Sentry), development workflows, and more.
+
 ## Multi-Slot Containers
 
 Run multiple authenticated Claude instances in the same project:
@@ -152,6 +186,9 @@ Service tokens (`--service-token-id` / `--service-token-secret`) are injected au
 ## Commands
 
 ```
+claudebox setup                     Interactive setup wizard
+claudebox vm                        VM and resource management
+claudebox agent                     Plugin and agent management
 claudebox                           Launch Claude interactively
 claudebox <claude-args>             Pass arguments through to Claude
 claudebox shell                     Open a zsh shell in the container

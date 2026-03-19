@@ -28,7 +28,7 @@ jobs:
           export TEST_HOME=$(mktemp -d)
           export HOME="$TEST_HOME"
           echo "Testing installation in $HOME"
-          bash ./claudebox.run.sh
+          bash ./dist/claudebox.run
           ls -la ~/.claudebox/scripts/bin/
           ~/.local/bin/claudebox --help || echo "OK (help displayed or no version flag)"
 
@@ -37,7 +37,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: claudebox-installer
-          path: claudebox.run.sh
+          path: dist/claudebox.run
 
   release:
     needs: test-installer
@@ -56,6 +56,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./claudebox.run.sh
-          asset_name: claudebox.run.sh
+          asset_path: ./dist/claudebox.run
+          asset_name: claudebox.run
           asset_content_type: application/x-sh
