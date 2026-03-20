@@ -254,7 +254,15 @@ run_claudebox_container() {
         fi
     fi
 
-    
+
+    # Mount AWS credentials if ~/.aws exists (for EKS, S3, etc.)
+    if [[ -d "$HOME/.aws" ]]; then
+        docker_args+=(-v "$HOME/.aws":"/home/$DOCKER_USER/.aws":ro)
+        if [[ "$VERBOSE" == "true" ]]; then
+            printf '[DEBUG] Mounting AWS credentials\n' >&2
+        fi
+    fi
+
     # Mount .env file if it exists in the project directory
     if [[ -f "$PROJECT_DIR/.env" ]]; then
         docker_args+=(-v "$PROJECT_DIR/.env":/workspace/.env:ro)
@@ -436,6 +444,11 @@ run_claudebox_container() {
         -e "ANTHROPIC_BASE_URL=${gateway_base_url}"
         -e "ANTHROPIC_CUSTOM_HEADERS=${gateway_custom_headers}"
         -e "ENABLE_TOOL_SEARCH=${gateway_tool_search}"
+        -e "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}"
+        -e "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}"
+        -e "AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}"
+        -e "AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-}"
+        -e "AWS_PROFILE=${AWS_PROFILE:-}"
         --cap-add NET_ADMIN
         --cap-add NET_RAW
     )

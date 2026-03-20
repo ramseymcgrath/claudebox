@@ -361,16 +361,13 @@ RUN apt-get update && apt-get install -y ansible && apt-get clean
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
     apt-get update && apt-get install -y docker-ce-cli docker-compose-plugin && apt-get clean
-# kubectl
-RUN curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/$(dpkg --print-architecture)/kubectl" && \
-    chmod +x /usr/local/bin/kubectl
 # Helm
 RUN curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 # Terraform
 RUN curl -fsSL https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_$(dpkg --print-architecture).zip -o /tmp/terraform.zip && \
     unzip -o /tmp/terraform.zip -d /usr/local/bin && \
     rm -f /tmp/terraform.zip
-# AWS CLI v2
+# AWS CLI v2 (includes eks get-token for EKS auth)
 RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip && \
     unzip -o /tmp/awscliv2.zip -d /tmp && \
     /tmp/aws/install && \
@@ -526,7 +523,7 @@ _builtin_profile_description() {
         ruby) printf '%s' "Ruby Development (gems, native deps, XML/YAML)" ;;
         php) printf '%s' "PHP Development (PHP + extensions + Composer)" ;;
         database) printf '%s' "Database Tools (clients for major databases)" ;;
-        devops) printf '%s' "DevOps Tools (Docker, Kubernetes, Terraform, etc.)" ;;
+        devops) printf '%s' "DevOps Tools (Docker, Helm, Terraform, AWS CLI)" ;;
         web) printf '%s' "Web Dev Tools (nginx, HTTP test clients)" ;;
         embedded) printf '%s' "Embedded Dev (ARM toolchain, serial debuggers)" ;;
         datascience) printf '%s' "Data Science (Python, Jupyter, R)" ;;

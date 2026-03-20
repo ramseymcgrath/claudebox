@@ -56,7 +56,7 @@ claudebox remove rust           # Remove a profile
 | `flutter` | Flutter via fvm |
 | `openwrt` | Cross toolchain, QEMU, distro tools |
 | `database` | PostgreSQL, MySQL, SQLite, Redis, MongoDB clients |
-| `devops` | Docker, kubectl, Helm, Terraform, Ansible, AWS CLI |
+| `devops` | Docker, Helm, Terraform, Ansible, AWS CLI (EKS-ready) |
 | `web` | nginx, Apache bench, HTTPie |
 | `embedded` | ARM GCC, GDB multiarch, OpenOCD, PlatformIO |
 | `datascience` | R, Jupyter, NumPy, pandas, scikit-learn (via uv) |
