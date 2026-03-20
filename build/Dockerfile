@@ -26,7 +26,11 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
 
-RUN groupadd -g $GROUP_ID $USERNAME || true && \
+RUN if getent group $GROUP_ID >/dev/null; then \
+        groupmod -n $USERNAME "$(getent group $GROUP_ID | cut -d: -f1)"; \
+    else \
+        groupadd -g $GROUP_ID $USERNAME; \
+    fi && \
     useradd -m -u $USER_ID -g $GROUP_ID -s /bin/bash $USERNAME
 
 RUN ARCH=$(dpkg --print-architecture) && \
