@@ -53,7 +53,8 @@
       "Bash(printf \"Syntax OK\\\\n\")",
       "Bash(bash -n lib/commands.sh)",
       "Bash(bash -n lib/cli.sh)",
-      "Bash(printf \"All syntax OK\\\\n\")"
+      "Bash(printf \"All syntax OK\\\\n\")",
+      "WebFetch(domain:download.docker.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
