@@ -343,7 +343,7 @@ main() {
                 
                 # Separate Python-only profiles from Docker-affecting profiles
                 local docker_profiles=()
-                local python_only_profiles=("python" "ml" "datascience")
+                local python_only_profiles=("python" "ml")
                 
                 for profile in "${current_profiles[@]}"; do
                     local is_python_only=false
@@ -537,25 +537,36 @@ build_docker_image() {
             [[ -n "$line" ]] && current_profiles+=("$line")
         done < <(read_profile_section "$profiles_file" "profiles")
         
-        # Generate profile installations
+        # Generate consolidated profile installations
+        local valid_profiles=()
         for profile in "${current_profiles[@]}"; do
             profile=$(printf '%s' "$profile" | tr -d '[:space:]')
             if [[ -z "$profile" ]]; then
                 continue
             fi
 
-            # Convert hyphens to underscores for function names
-            local profile_fn="get_profile_${profile//-/_}"
-            if type -t "$profile_fn" >/dev/null; then
-                profile_installations+=$'\n'"$($profile_fn)"
-            elif custom_profile_exists "$profile"; then
+            # Skip removed profiles with warning
+            if _is_removed_profile "$profile"; then
+                warn "Profile \"$profile\" has been removed and will be skipped."
+                continue
+            fi
+
+            # Check for custom profiles
+            if custom_profile_exists "$profile"; then
                 profile_installations+=$'\n'"$(get_custom_profile "$profile")"
+            else
+                valid_profiles+=("$profile")
             fi
         done
+
+        # Use consolidated installation for built-in profiles
+        if [[ ${#valid_profiles[@]} -gt 0 ]]; then
+            profile_installations+=$'\n'"$(generate_consolidated_profile_installations "${valid_profiles[@]}")"
+        fi
         
         # Calculate hash only for Docker-affecting profiles
         local docker_profiles=()
-        local python_only_profiles=("python" "ml" "datascience")
+        local python_only_profiles=("python" "ml")
         
         for profile in "${current_profiles[@]}"; do
             local is_python_only=false

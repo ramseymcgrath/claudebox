@@ -64,7 +64,7 @@ md5_file() {
 # Calculate MD5 hash of a string (cross-platform)
 md5_string() {
     local string="$1"
-    echo -n "$string" | $MD5_CMD 2>/dev/null | eval $MD5_EXTRACT
+    printf '%s' "$string" | $MD5_CMD 2>/dev/null | eval $MD5_EXTRACT
 }
 
 # Initialize MD5 command on library load

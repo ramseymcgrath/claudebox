@@ -312,7 +312,7 @@ run_claudebox_container() {
     local project_mcp_file=""
     
     # Track all temporary MCP files for cleanup
-    declare -a mcp_temp_files=()
+    mcp_temp_files=()
     
     # Set up cleanup trap for temporary MCP config files
     cleanup_mcp_files() {

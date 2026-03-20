@@ -178,6 +178,89 @@ claudebox gateway url https://my-proxy.example.com/v1
 
 Create an AI Gateway in your Cloudflare dashboard under AI > AI Gateway. The account ID is in your Cloudflare dashboard URL; the gateway ID is the name you chose when creating the gateway.
 
+## VS Code Integration
+
+Use ClaudeBox containers as a full VS Code Dev Container environment. One command generates all the config you need:
+
+```bash
+claudebox devcontainer
+```
+
+This generates three files:
+
+| File | Purpose |
+|------|---------|
+| `.devcontainer/devcontainer.json` | Dev Container config referencing your ClaudeBox image |
+| `.vscode/tasks.json` | Run tasks from the command palette / status bar |
+| `.vscode/launch.json` | Debug configs matched to your active profiles |
+
+### Getting Started
+
+```bash
+cd ~/your-project
+claudebox                          # Build image (if not already built)
+claudebox add python rust          # Add profiles you need
+claudebox devcontainer             # Generate VS Code configs
+```
+
+Then in VS Code:
+1. Install the **Dev Containers** extension (`ms-vscode-remote.remote-containers`)
+2. Open the project folder
+3. `Cmd+Shift+P` -> **Dev Containers: Reopen in Container**
+
+VS Code connects to the same ClaudeBox image with all your profiles, tools, and language support pre-installed.
+
+### Tasks (Terminal -> Run Task)
+
+The generated `tasks.json` provides these tasks accessible via `Cmd+Shift+P` -> **Tasks: Run Task** or from the Terminal menu:
+
+| Task | What it does |
+|------|-------------|
+| **Claude: Launch** | Start Claude CLI in a dedicated terminal |
+| **Claude: Shell** | Open a zsh shell inside the container |
+| **Claude: Update** | Update Claude CLI to latest version |
+| **ClaudeBox: Rebuild Image** | Rebuild the Docker image from host |
+| **ClaudeBox: Show Info** | Display project and system info |
+
+Profile-specific tasks are added automatically:
+- **Python** profiles add "Run File" and "Run Tests" (pytest) tasks
+- **Rust** profiles add "Build" and "Test" (cargo) tasks
+- **Go** profiles add "Build" and "Test" tasks
+- **JavaScript** profiles add "Install" (npm) and "Test" tasks
+- **Java** profiles add "Maven Build" task
+
+### Debug Configurations (Run and Debug panel)
+
+Launch configs are generated based on active profiles so `F5` works out of the box:
+
+- **Python**: debugpy file launcher
+- **Rust**: gdb via cppdbg
+- **Go**: delve launcher
+- **JavaScript/Node**: node inspector
+- **C/C++**: gdb via cppdbg
+- **Java**: Java debug launcher
+- **Flutter**: Dart launcher
+
+### Extensions
+
+VS Code extensions are recommended automatically based on your ClaudeBox profiles. For example, adding `python` and `rust` profiles will include `ms-python.python`, `ms-python.vscode-pylance`, and `rust-lang.rust-analyzer` in the container config.
+
+### Re-generating
+
+Run `claudebox devcontainer` again after changing profiles. It will prompt before overwriting `devcontainer.json`. The `.vscode/tasks.json` and `.vscode/launch.json` are only written if they don't already exist, so your customizations are preserved.
+
+### Gitignore
+
+You may want to add the generated files to `.gitignore` if they're user-specific:
+
+```gitignore
+.devcontainer/
+.vscode/tasks.json
+.vscode/launch.json
+```
+
+Or commit them to share the dev environment with your team.
+
 ## Commands
 
 ```
@@ -212,6 +295,7 @@ claudebox projects                  List all ClaudeBox projects
 claudebox project <name>            Open project by name
 claudebox allowlist                 View/edit firewall rules
 
+claudebox devcontainer              Generate VS Code Dev Container config
 claudebox save [flags...]           Save default CLI flags
 claudebox rebuild                   Force Docker image rebuild
 claudebox update                    Update Claude CLI

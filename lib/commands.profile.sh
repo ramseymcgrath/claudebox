@@ -189,7 +189,7 @@ _cmd_add() {
     # Check if any Python-related profiles were added
     local python_profiles_added=false
     for profile in "${selected[@]}"; do
-        if [[ "$profile" == "python" ]] || [[ "$profile" == "ml" ]] || [[ "$profile" == "datascience" ]]; then
+        if [[ "$profile" == "python" ]] || [[ "$profile" == "ml" ]]; then
             python_profiles_added=true
             break
         fi
@@ -207,7 +207,7 @@ _cmd_add() {
     # Only show rebuild message for non-Python profiles
     local needs_rebuild=false
     for profile in "${selected[@]}"; do
-        if [[ "$profile" != "python" ]] && [[ "$profile" != "ml" ]] && [[ "$profile" != "datascience" ]]; then
+        if [[ "$profile" != "python" ]] && [[ "$profile" != "ml" ]]; then
             needs_rebuild=true
             break
         fi
@@ -281,7 +281,7 @@ _cmd_remove() {
             if [[ "$profile" == "$remove" ]]; then
                 keep=false
                 # Check if we're removing a Python-related profile
-                if [[ "$profile" == "python" ]] || [[ "$profile" == "ml" ]] || [[ "$profile" == "datascience" ]]; then
+                if [[ "$profile" == "python" ]] || [[ "$profile" == "ml" ]]; then
                     python_profiles_removed=true
                 fi
                 break
@@ -293,7 +293,7 @@ _cmd_remove() {
     # Check if any Python-related profiles remain
     local has_python_profiles=false
     for profile in "${new_profiles[@]}"; do
-        if [[ "$profile" == "python" ]] || [[ "$profile" == "ml" ]] || [[ "$profile" == "datascience" ]]; then
+        if [[ "$profile" == "python" ]] || [[ "$profile" == "ml" ]]; then
             has_python_profiles=true
             break
         fi

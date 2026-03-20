@@ -1,4 +1,4 @@
-FROM debian:bookworm
+FROM debian:bookworm-slim
 ARG USER_ID GROUP_ID USERNAME NODE_VERSION DELTA_VERSION
 ARG REBUILD_TIMESTAMP
 
@@ -19,8 +19,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     chmod 644 /usr/share/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg]" \
     "https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && apt-get update && \
-        apt-get install -y --no-autoremove --no-install-recommends apt-utils wget zsh fzf ca-certificates sudo git tmux iptables ipset gh zip unzip jq \
-        procps vim nano less iputils-ping traceroute dnsutils netcat-openbsd net-tools xdg-utils
+        apt-get install -y --no-autoremove --no-install-recommends apt-utils wget zsh fzf sudo git tmux iptables ipset gh zip unzip jq \
+        procps less
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
@@ -38,7 +38,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
 USER $USERNAME
 WORKDIR /home/$USERNAME
 
-RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.0/zsh-in-docker.sh)" -- \
+RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.1/zsh-in-docker.sh)" -- \
     -p git \
     -p fzf \
     -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
@@ -72,10 +72,10 @@ ENV DEVCONTAINER=true
 
 ENV SHELL=/bin/zsh
 
+# NVM + Node + Claude CLI consolidated layer
 ENV NVM_DIR="/home/$USERNAME/.nvm"
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-
-RUN bash -c "source $NVM_DIR/nvm.sh && \
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash && \
+    bash -c "source $NVM_DIR/nvm.sh && \
     if [[ \"$NODE_VERSION\" == '--lts' ]]; then \
         nvm install --lts && \
         nvm alias default 'lts/*'; \
@@ -83,16 +83,13 @@ RUN bash -c "source $NVM_DIR/nvm.sh && \
         nvm install $NODE_VERSION && \
         nvm alias default $NODE_VERSION; \
     fi && \
-    nvm use default"
-
-RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc && \
+    nvm use default && \
+    npm install -g @anthropic-ai/claude-code" && \
+    echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc && \
     echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc && \
     echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.bashrc
 
-RUN bash -c "source $NVM_DIR/nvm.sh && \
-    nvm use default && \
-    npm install -g @anthropic-ai/claude-code"
-
+# Shell config consolidated layer
 RUN cat >> ~/.zshrc <<'EOF'
 
 if [[ -n "$PS1" ]] && command -v stty >/dev/null; then
@@ -105,10 +102,8 @@ if [[ -n "$PS1" ]] && command -v stty >/dev/null; then
   _update_size
 fi
 EOF
-
-RUN echo "shopt -s checkwinsize" >> ~/.bashrc
-
-RUN cat > ~/.tmux.conf <<'EOF'
+RUN echo "shopt -s checkwinsize" >> ~/.bashrc && \
+    cat > ~/.tmux.conf <<'EOF'
 
 set -g aggressive-resize on
 
@@ -155,10 +150,6 @@ RUN bash -c "source $NVM_DIR/nvm.sh && claude --version"
 
 WORKDIR /workspace
 USER root
-
-# Use REBUILD_TIMESTAMP to bust cache when templates change
-ARG REBUILD_TIMESTAMP
-RUN echo "Rebuild timestamp: ${REBUILD_TIMESTAMP:-none}" > /dev/null
 
 COPY --chown=$USERNAME docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 RUN sed -i "s|DOCKERUSER|$USERNAME|g" /usr/local/bin/docker-entrypoint && \

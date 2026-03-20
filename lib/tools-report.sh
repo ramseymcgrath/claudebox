@@ -317,16 +317,6 @@ _describe_profile() {
             echo
             ;;
             
-        web)
-            echo "**Web Server Tools**"
-            echo
-            echo "Web server utilities:"
-            echo "- nginx - High-performance web server"
-            echo "- apache2-utils - Apache utilities (htpasswd, ab)"
-            echo "- httpie - User-friendly HTTP client"
-            echo
-            ;;
-            
         embedded)
             echo "**Embedded Development Tools**"
             echo
@@ -337,40 +327,6 @@ _describe_profile() {
             echo "- picocom/minicom - Serial terminal programs"
             echo "- screen - Terminal multiplexer (for serial)"
             echo "- PlatformIO - Embedded development platform"
-            echo
-            ;;
-            
-        datascience)
-            echo "**Data Science Environment**"
-            echo
-            echo "Complete data science toolkit:"
-            echo "- Python 3 with venv"
-            echo "- R - Statistical computing language"
-            echo "- jupyter - Interactive notebooks"
-            echo "- notebook - Classic Jupyter notebook"
-            echo "- jupyterlab - JupyterLab interface"
-            echo "- numpy - Numerical computing"
-            echo "- pandas - Data analysis and manipulation"
-            echo "- scipy - Scientific computing"
-            echo "- matplotlib - Plotting library"
-            echo "- seaborn - Statistical data visualization"
-            echo "- scikit-learn - Machine learning library"
-            echo "- statsmodels - Statistical modeling"
-            echo "- plotly - Interactive visualizations"
-            echo
-            ;;
-            
-        security)
-            echo "**Security Analysis Tools**"
-            echo
-            echo "Security testing and analysis:"
-            echo "- nmap - Network exploration and security auditing"
-            echo "- tcpdump - Packet analyzer"
-            echo "- wireshark-common - Network protocol analyzer (CLI tools)"
-            echo "- netcat - Network utility for reading/writing data"
-            echo "- john - Password cracker"
-            echo "- hashcat - Advanced password recovery"
-            echo "- hydra - Network login cracker"
             echo
             ;;
             
@@ -385,17 +341,6 @@ _describe_profile() {
             echo "- numpy - Numerical computing"
             echo "- pandas - Data analysis and manipulation"
             echo "- matplotlib - Plotting library"
-            echo
-            ;;
-            
-        openwrt)
-            echo "**OpenWRT Development Environment**"
-            echo
-            echo "OpenWRT/embedded Linux development:"
-            echo "- Cross-compilation toolchains"
-            echo "- QEMU emulators (ARM, AArch64, MIPS, x86)"
-            echo "- Build dependencies for OpenWRT"
-            echo "- Subversion, ccache for faster builds"
             echo
             ;;
             

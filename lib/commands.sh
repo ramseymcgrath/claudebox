@@ -122,6 +122,13 @@ source "${LIB_DIR}/commands.doctor.sh"
 source "${LIB_DIR}/commands.snapshot.sh"
 
 # ============================================================================
+# DEVCONTAINER COMMANDS - VS Code Dev Container integration
+# ============================================================================
+# Commands: devcontainer
+# - devcontainer: Generates .devcontainer/devcontainer.json for VS Code
+source "${LIB_DIR}/commands.devcontainer.sh"
+
+# ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
@@ -192,6 +199,7 @@ show_help() {
   snapshot [name]                 Save current slot state
   snapshot list                   List saved snapshots
   snapshot restore <name>         Restore a snapshot to a slot
+  devcontainer                    Generate .devcontainer config for VS Code
   reinstall                       Clean Docker resources and rebuild from scratch
   uninstall                       Fully remove ClaudeBox from the system"
     
@@ -306,6 +314,7 @@ show_full_help() {
   slot <number>                   Launch a specific container slot\
   project <name>                  Open project by name/hash from anywhere\
   tmux                            Launch ClaudeBox with tmux support enabled\
+  devcontainer                    Generate VS Code Dev Container config\
   doctor                          Run diagnostic health checks\
   snapshot [name]                 Save current slot state\
   snapshot restore <name>         Restore a snapshot to a slot\
@@ -398,6 +407,7 @@ dispatch_command() {
         # Doctor and snapshot commands
         doctor)           _cmd_doctor "$@" ;;
         snapshot)         _cmd_snapshot "$@" ;;
+        devcontainer)     _cmd_devcontainer "$@" ;;
 
         # Special commands that modify container
         config|migrate-installer)

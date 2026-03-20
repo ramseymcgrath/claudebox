@@ -135,7 +135,7 @@ if [ -n "${CLAUDEBOX_PROJECT_NAME:-}" ]; then
         fi
 
         # Check if Python profile is added and deploy Python dev tools if needed
-        if [ -f "$CONFIG_FILE" ] && grep -qE 'python|ml|datascience' "$CONFIG_FILE"; then
+        if [ -f "$CONFIG_FILE" ] && grep -qE 'python|ml' "$CONFIG_FILE"; then
             if [ ! -f "$PYDEV_FLAG" ] && [ -f "$VENV_FLAG" ] && [ -d "$VENV_DIR" ]; then
                 # Deploy Python dev tools based on profile
                 python_packages=""
@@ -148,11 +148,6 @@ if [ -n "${CLAUDEBOX_PROJECT_NAME:-}" ]; then
                 # ML profile packages
                 if grep -q 'ml' "$CONFIG_FILE"; then
                     python_packages="$python_packages torch transformers scikit-learn numpy pandas matplotlib"
-                fi
-                
-                # Data science profile packages
-                if grep -q 'datascience' "$CONFIG_FILE"; then
-                    python_packages="$python_packages jupyter notebook jupyterlab numpy pandas scipy matplotlib seaborn scikit-learn statsmodels plotly"
                 fi
                 
                 # Remove duplicates and install

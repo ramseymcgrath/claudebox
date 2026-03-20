@@ -156,7 +156,16 @@ _cmd_update() {
             # If it's a symlink, replace it with the actual file first
             if [[ -L "$installed_path" ]]; then
                 info "Converting symlink to real file..."
-                local source_file=$(readlink -f "$installed_path")
+                local source_file="$installed_path"
+                while [[ -L "$source_file" ]]; do
+                    local link_target
+                    link_target=$(readlink "$source_file")
+                    if [[ "$link_target" = /* ]]; then
+                        source_file="$link_target"
+                    else
+                        source_file="$(dirname "$source_file")/$link_target"
+                    fi
+                done
                 if [[ -w "$(dirname "$installed_path")" ]]; then
                     cp "$source_file" "$installed_path.tmp"
                     mv "$installed_path.tmp" "$installed_path"
@@ -204,15 +213,15 @@ _cmd_update() {
         mkdir -p "$commands_dir"
         
         for cmd in taskengine devops; do
-            echo -n "  Updating $cmd.md... "
+            printf '%s' "  Updating $cmd.md... "
             if command -v curl >/dev/null 2>&1; then
                 curl -fsSL "https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/commands/$cmd.md" -o "$commands_dir/$cmd.md"
             else
                 wget -qO "$commands_dir/$cmd.md" "https://raw.githubusercontent.com/ramseymcgrath/claudebox/main/commands/$cmd.md"
             fi
-            echo "✓"
+            printf '%s\n' "✓"
         done
-        echo
+        printf '\n'
         
         # Now update Claude
         info "Updating Claude..."

@@ -16,7 +16,7 @@ export CLAUDEBOX_HOME="${HOME}/.claudebox"
 
 # Version constants
 readonly NODE_VERSION="--lts"
-readonly DELTA_VERSION="0.17.0"
+readonly DELTA_VERSION="0.19.0"
 
 # Script path resolution - moved to main claudebox.sh since it needs BASH_SOURCE
 # SCRIPT_PATH will be set by main script

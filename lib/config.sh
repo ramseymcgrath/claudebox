@@ -4,22 +4,36 @@
 # -------- INI file helpers ----------------------------------------------------
 _read_ini() {               # $1=file $2=section $3=key
   awk -F' *= *' -v s="[$2]" -v k="$3" '
-    $0==s {in=1; next}
-    /^\[/ {in=0}
-    in && $1==k {print $2; exit}
+    $0==s {found=1; next}
+    /^\[/ {found=0}
+    found && $1==k {print $2; exit}
   ' "$1" 2>/dev/null
 }
 
+# -------- Removed profiles graceful migration ---------------------------------
+# Profiles that have been removed. If found in a user's profiles.ini, emit a
+# warning and skip rather than erroring out.
+readonly _REMOVED_PROFILES="openwrt web security datascience"
+
+_is_removed_profile() {
+    local profile="$1"
+    local p
+    for p in $_REMOVED_PROFILES; do
+        if [[ "$p" == "$profile" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 # -------- Profile functions (Bash 3.2 compatible) -----------------------------
 get_profile_packages() {
     case "$1" in
         core) echo "gcc g++ make git pkg-config libssl-dev libffi-dev zlib1g-dev tmux" ;;
         build-tools) echo "cmake ninja-build autoconf automake libtool" ;;
-        shell) echo "rsync openssh-client man-db gnupg2 aggregate file" ;;
-        networking) echo "iptables ipset iproute2 dnsutils" ;;
+        shell) echo "rsync openssh-client man-db gnupg2 aggregate file vim nano" ;;
+        networking) echo "iptables ipset iproute2 dnsutils iputils-ping traceroute netcat-openbsd net-tools" ;;
         c) echo "gdb valgrind clang clang-format clang-tidy cppcheck doxygen libboost-all-dev libcmocka-dev libcmocka0 lcov libncurses5-dev libncursesw5-dev" ;;
-        openwrt) echo "rsync libncurses5-dev zlib1g-dev gawk gettext xsltproc libelf-dev ccache subversion swig time qemu-system-arm qemu-system-aarch64 qemu-system-mips qemu-system-x86 qemu-utils" ;;
         rust) echo "" ;;  # Rust installed via rustup
         python) echo "" ;;  # Managed via uv
         go) echo "" ;;  # Installed from tarball
@@ -30,10 +44,7 @@ get_profile_packages() {
         php) echo "php php-cli php-fpm php-mysql php-pgsql php-sqlite3 php-curl php-gd php-mbstring php-xml php-zip" ;;  # composer installed via binary
         database) echo "postgresql-client default-mysql-client sqlite3 redis-tools" ;;  # mongosh installed via binary
         devops) echo "ansible" ;;  # Other tools installed via binary downloads
-        web) echo "nginx apache2-utils httpie" ;;
         embedded) echo "gcc-arm-none-eabi gdb-multiarch openocd picocom minicom screen" ;;
-        datascience) echo "r-base" ;;
-        security) echo "nmap tcpdump wireshark-common netcat-openbsd john hashcat hydra" ;;
         ml) echo "" ;;  # Just cmake needed, comes from build-tools now
         *) echo "" ;;
     esac
@@ -43,10 +54,9 @@ get_profile_description() {
     case "$1" in
         core) echo "Core Development Utilities (compilers, VCS, shell tools)" ;;
         build-tools) echo "Build Tools (CMake, autotools, Ninja)" ;;
-        shell) echo "Optional Shell Tools (fzf, SSH, man, rsync, file)" ;;
-        networking) echo "Network Tools (IP stack, DNS, route tools)" ;;
+        shell) echo "Optional Shell Tools (fzf, SSH, man, rsync, file, vim, nano)" ;;
+        networking) echo "Network Tools (IP stack, DNS, route tools, ping, traceroute)" ;;
         c) echo "C/C++ Development (debuggers, analyzers, Boost, ncurses, cmocka)" ;;
-        openwrt) echo "OpenWRT Development (cross toolchain, QEMU, distro tools)" ;;
         rust) echo "Rust Development (installed via rustup)" ;;
         python) echo "Python Development (managed via uv)" ;;
         go) echo "Go Development (installed from upstream archive)" ;;
@@ -57,17 +67,14 @@ get_profile_description() {
         php) echo "PHP Development (PHP + extensions + Composer)" ;;
         database) echo "Database Tools (clients for major databases)" ;;
         devops) echo "DevOps Tools (Docker, Kubernetes, Terraform, etc.)" ;;
-        web) echo "Web Dev Tools (nginx, HTTP test clients)" ;;
         embedded) echo "Embedded Dev (ARM toolchain, serial debuggers)" ;;
-        datascience) echo "Data Science (Python, Jupyter, R)" ;;
-        security) echo "Security Tools (scanners, crackers, packet tools)" ;;
         ml) echo "Machine Learning (build layer only; Python via uv)" ;;
         *) echo "" ;;
     esac
 }
 
 get_all_profile_names() {
-    echo "core build-tools shell networking c openwrt rust python go flutter javascript java ruby php database devops web embedded datascience security ml"
+    echo "core build-tools shell networking c rust python go flutter javascript java ruby php database devops embedded ml"
 }
 
 profile_exists() {
@@ -78,23 +85,6 @@ profile_exists() {
         fi
     done
     return 1
-}
-
-expand_profile() {
-    case "$1" in
-        c) echo "core build-tools c" ;;
-        openwrt) echo "core build-tools openwrt" ;;
-        ml) echo "core build-tools ml" ;;
-        rust|go|flutter|python|php|ruby|java|database|devops|web|embedded|datascience|security|javascript)
-            echo "core $1"
-            ;;
-        shell|networking|build-tools|core)
-            echo "$1"
-            ;;
-        *)
-            echo "$1"
-            ;;
-    esac
 }
 
 # -------- Profile file management ---------------------------------------------
@@ -250,13 +240,6 @@ get_profile_c() {
     fi
 }
 
-get_profile_openwrt() {
-    local packages=$(get_profile_packages "openwrt")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
-}
-
 get_profile_rust() {
     cat << 'EOF'
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -375,13 +358,6 @@ RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -
 EOF
 }
 
-get_profile_web() {
-    local packages=$(get_profile_packages "web")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
-}
-
 get_profile_embedded() {
     local packages=$(get_profile_packages "embedded")
     if [[ -n "$packages" ]]; then
@@ -394,25 +370,75 @@ EOF
     fi
 }
 
-get_profile_datascience() {
-    local packages=$(get_profile_packages "datascience")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
-}
-
-get_profile_security() {
-    local packages=$(get_profile_packages "security")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
-}
-
 get_profile_ml() {
     # ML profile just needs build tools which are dependencies
     printf '%s\n' "# ML profile uses build-tools for compilation"
 }
 
+# -------- Consolidated profile installation generator -------------------------
+# Collects all apt packages from selected profiles into a single deduplicated
+# apt-get install, then emits non-apt installations as separate layers.
+generate_consolidated_profile_installations() {
+    local profiles=("$@")
+    local all_apt_packages=""
+    local non_apt_output=""
+
+    for profile in "${profiles[@]}"; do
+        profile=$(printf '%s' "$profile" | tr -d '[:space:]')
+        if [[ -z "$profile" ]]; then
+            continue
+        fi
+
+        # Skip removed profiles with a warning
+        if _is_removed_profile "$profile"; then
+            printf 'Warning: Profile "%s" has been removed and will be skipped.\n' "$profile" >&2
+            continue
+        fi
+
+        # Collect apt packages
+        local pkgs
+        pkgs=$(get_profile_packages "$profile")
+        if [[ -n "$pkgs" ]]; then
+            all_apt_packages="$all_apt_packages $pkgs"
+        fi
+
+        # Collect non-apt installations (profiles that have custom install logic)
+        case "$profile" in
+            core|build-tools|shell|networking|c|ruby|ml)
+                # These are apt-only profiles, already handled above
+                ;;
+            *)
+                # Convert hyphens to underscores for function names
+                local profile_fn="get_profile_${profile//-/_}"
+                if type -t "$profile_fn" >/dev/null; then
+                    local output
+                    output=$("$profile_fn")
+                    # Filter out any apt-get lines (already consolidated)
+                    local filtered
+                    filtered=$(printf '%s\n' "$output" | grep -v '^RUN apt-get' | grep -v '^# .* profile' || true)
+                    if [[ -n "$filtered" ]]; then
+                        non_apt_output="$non_apt_output"$'\n'"$filtered"
+                    fi
+                fi
+                ;;
+        esac
+    done
+
+    # Deduplicate apt packages and emit single RUN
+    if [[ -n "$all_apt_packages" ]]; then
+        # Deduplicate by splitting into words, sorting, and removing dupes
+        local deduped
+        deduped=$(printf '%s\n' $all_apt_packages | sort -u | tr '\n' ' ' | sed 's/ *$//')
+        if [[ -n "$deduped" ]]; then
+            printf 'RUN apt-get update && apt-get install -y %s && apt-get clean\n' "$deduped"
+        fi
+    fi
+
+    # Emit non-apt installations
+    if [[ -n "$non_apt_output" ]]; then
+        printf '%s\n' "$non_apt_output"
+    fi
+}
 
 # -------- Custom profile support -----------------------------------------------
 # Users can add custom profiles as shell scripts in ~/.claudebox/custom-profiles/
@@ -485,12 +511,16 @@ profile_exists() {
     if custom_profile_exists "$profile"; then
         return 0
     fi
+    # Check if it's a removed profile (exists conceptually but deprecated)
+    if _is_removed_profile "$profile"; then
+        return 0
+    fi
     return 1
 }
 
 # Override get_all_profile_names to include custom profiles
 _builtin_profile_names() {
-    printf '%s' "core build-tools shell networking c openwrt rust python go flutter javascript java ruby php database devops web embedded datascience security ml"
+    printf '%s' "core build-tools shell networking c rust python go flutter javascript java ruby php database devops embedded ml"
 }
 
 get_all_profile_names() {
@@ -510,10 +540,9 @@ _builtin_profile_description() {
     case "$1" in
         core) printf '%s' "Core Development Utilities (compilers, VCS, shell tools)" ;;
         build-tools) printf '%s' "Build Tools (CMake, autotools, Ninja)" ;;
-        shell) printf '%s' "Optional Shell Tools (fzf, SSH, man, rsync, file)" ;;
-        networking) printf '%s' "Network Tools (IP stack, DNS, route tools)" ;;
+        shell) printf '%s' "Optional Shell Tools (fzf, SSH, man, rsync, file, vim, nano)" ;;
+        networking) printf '%s' "Network Tools (IP stack, DNS, route tools, ping, traceroute)" ;;
         c) printf '%s' "C/C++ Development (debuggers, analyzers, Boost, ncurses, cmocka)" ;;
-        openwrt) printf '%s' "OpenWRT Development (cross toolchain, QEMU, distro tools)" ;;
         rust) printf '%s' "Rust Development (installed via rustup)" ;;
         python) printf '%s' "Python Development (managed via uv)" ;;
         go) printf '%s' "Go Development (installed from upstream archive)" ;;
@@ -524,10 +553,7 @@ _builtin_profile_description() {
         php) printf '%s' "PHP Development (PHP + extensions + Composer)" ;;
         database) printf '%s' "Database Tools (clients for major databases)" ;;
         devops) printf '%s' "DevOps Tools (Docker, Helm, Terraform, AWS CLI)" ;;
-        web) printf '%s' "Web Dev Tools (nginx, HTTP test clients)" ;;
         embedded) printf '%s' "Embedded Dev (ARM toolchain, serial debuggers)" ;;
-        datascience) printf '%s' "Data Science (Python, Jupyter, R)" ;;
-        security) printf '%s' "Security Tools (scanners, crackers, packet tools)" ;;
         ml) printf '%s' "Machine Learning (build layer only; Python via uv)" ;;
         *) printf '' ;;
     esac
@@ -543,11 +569,13 @@ get_profile_description() {
     fi
 }
 
-export -f _read_ini get_profile_packages get_profile_description get_all_profile_names profile_exists expand_profile
+export -f _read_ini get_profile_packages get_profile_description get_all_profile_names profile_exists
+export -f _is_removed_profile
 export -f get_profile_file_path read_config_value read_profile_section update_profile_section get_current_profiles
-export -f get_profile_core get_profile_build_tools get_profile_shell get_profile_networking get_profile_c get_profile_openwrt
+export -f get_profile_core get_profile_build_tools get_profile_shell get_profile_networking get_profile_c
 export -f get_profile_rust get_profile_python get_profile_go get_profile_flutter get_profile_javascript get_profile_java get_profile_ruby
-export -f get_profile_php get_profile_database get_profile_devops get_profile_web get_profile_embedded get_profile_datascience
-export -f get_profile_security get_profile_ml
+export -f get_profile_php get_profile_database get_profile_devops get_profile_embedded
+export -f get_profile_ml
+export -f generate_consolidated_profile_installations
 export -f get_custom_profile_names custom_profile_exists get_custom_profile get_custom_profile_description
 export -f _builtin_profile_exists _builtin_profile_names _builtin_profile_description
