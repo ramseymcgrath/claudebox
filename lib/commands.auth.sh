@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Auth & Tunnel Commands - Persistent authentication and tunnel management
+# Auth & Gateway Commands - Persistent authentication and API gateway management
 # ============================================================================
-# Commands: auth, tunnel
-# Manages persistent auth tokens and Cloudflare tunnel configuration
+# Commands: auth, gateway
+# Manages persistent auth tokens and Cloudflare AI Gateway configuration
 
 _cmd_auth() {
     local auth_dir="$HOME/.claudebox/auth"
@@ -95,242 +95,213 @@ _cmd_auth() {
     esac
 }
 
-_cmd_tunnel() {
-    local tunnel_config="$HOME/.claudebox/tunnel.yml"
-    local cf_creds_dir="$HOME/.claudebox/cloudflared"
-    local tunnel_env="$HOME/.claudebox/tunnel.env"
+_cmd_gateway() {
+    local gateway_env="$HOME/.claudebox/gateway.env"
 
     case "${1:-}" in
         setup)
             shift
-            local tunnel_url="${1:-}"
+            local account_id="${1:-}"
+            local gateway_id="${2:-}"
 
-            if [[ -z "$tunnel_url" ]]; then
-                printf "Usage: claudebox tunnel setup <hostname>\n"
+            if [[ -z "$account_id" ]] || [[ -z "$gateway_id" ]]; then
+                printf "Usage: claudebox gateway setup <account-id> <gateway-id>\n"
                 printf '\n'
                 printf "Examples:\n"
-                printf "  claudebox tunnel setup myapp.example.com\n"
-                printf "  claudebox tunnel setup ssh.internal.example.com\n"
+                printf "  claudebox gateway setup abc123def456 my-gateway\n"
                 printf '\n'
-                printf '%s\n' "The hostname of your Cloudflare Access-protected application."
-                printf '%s\n' "cloudflared access commands will use this as the target."
+                printf '%s\n' "Find these in your Cloudflare dashboard under AI > AI Gateway."
+                printf '%s\n' "The account ID is in your Cloudflare URL; the gateway ID is the name"
+                printf '%s\n' "you gave when creating the gateway."
+                printf '\n'
+                printf '%s\n' "You will also need a Cloudflare API token with AI Gateway permissions."
+                printf '%s\n' "Create one at: dash.cloudflare.com > My Profile > API Tokens"
                 exit 1
             fi
 
-            mkdir -p "$HOME/.claudebox" "$cf_creds_dir"
-
-            # Save tunnel hostname
-            {
-                printf 'CF_ACCESS_HOSTNAME=%s\n' "$tunnel_url"
-                # Preserve existing service token values if set
-                if [[ -f "$tunnel_env" ]]; then
-                    grep '^CF_ACCESS_SERVICE_TOKEN_ID=' "$tunnel_env" 2>/dev/null || true
-                    grep '^CF_ACCESS_SERVICE_TOKEN_SECRET=' "$tunnel_env" 2>/dev/null || true
-                    grep '^CF_ACCESS_TCP_FORWARD=' "$tunnel_env" 2>/dev/null || true
-                fi
-            } > "${tunnel_env}.tmp" && mv "${tunnel_env}.tmp" "$tunnel_env"
-
-            cecho "Tunnel configured:" "$GREEN"
-            printf "  Hostname: %s\n" "$tunnel_url"
-            printf '\n'
-            printf '%s\n' "Next steps:"
-            printf "  ${CYAN}claudebox tunnel service-token <id> <secret>${NC}  Set service token for headless auth\n"
-            printf "  ${CYAN}claudebox add tunnel${NC}                         Install cloudflared in containers\n"
-            printf '\n'
-            ;;
-
-        service-token)
-            shift
-            local token_id="${1:-}"
-            local token_secret="${2:-}"
-
-            if [[ -z "$token_id" ]] || [[ -z "$token_secret" ]]; then
-                printf "Usage: claudebox tunnel service-token <client-id> <client-secret>\n"
-                printf '\n'
-                printf '%s\n' "Create a Service Token in Cloudflare Zero Trust dashboard:"
-                printf '%s\n' "  Access > Service Auth > Service Tokens > Create"
-                printf '\n'
-                printf '%s\n' "Service tokens allow headless authentication from Docker containers"
-                printf '%s\n' "without needing a browser. The token ID and secret are passed as"
-                printf '%s\n' "CF-Access-Client-Id and CF-Access-Client-Secret headers."
-                exit 1
-            fi
+            local base_url="https://gateway.ai.cloudflare.com/v1/${account_id}/${gateway_id}/anthropic"
 
             mkdir -p "$HOME/.claudebox"
 
-            # Update or create the tunnel env file
-            local existing=""
-            if [[ -f "$tunnel_env" ]]; then
-                existing=$(grep -v '^CF_ACCESS_SERVICE_TOKEN_ID=' "$tunnel_env" | grep -v '^CF_ACCESS_SERVICE_TOKEN_SECRET=' || true)
+            # Check for existing token
+            local existing_token=""
+            if [[ -f "$gateway_env" ]]; then
+                existing_token=$(grep '^CF_AIG_TOKEN=' "$gateway_env" 2>/dev/null | cut -d= -f2- || true)
             fi
-            {
-                if [[ -n "$existing" ]]; then
-                    printf '%s\n' "$existing"
-                fi
-                printf 'CF_ACCESS_SERVICE_TOKEN_ID=%s\n' "$token_id"
-                printf 'CF_ACCESS_SERVICE_TOKEN_SECRET=%s\n' "$token_secret"
-            } > "${tunnel_env}.tmp" && mv "${tunnel_env}.tmp" "$tunnel_env"
-            chmod 600 "$tunnel_env"
 
-            cecho "Service token saved" "$GREEN"
-            printf '%s\n' "Containers will authenticate using these credentials automatically."
-            printf '%s\n' "Use 'cloudflared access' commands inside the container, or"
-            printf '%s\n' "set up TCP forwarding with 'claudebox tunnel forward'."
-            ;;
-
-        forward)
-            shift
-            local forward_spec="${1:-}"
-
-            if [[ -z "$forward_spec" ]]; then
-                printf "Usage: claudebox tunnel forward <local-port>:<remote-host>:<remote-port>\n"
+            # Prompt for API token if not already set
+            if [[ -z "$existing_token" ]]; then
                 printf '\n'
-                printf "Examples:\n"
-                printf "  claudebox tunnel forward 8080:internal-api.lan:443\n"
-                printf "  claudebox tunnel forward 5432:db.internal:5432\n"
-                printf '\n'
-                printf '%s\n' "Sets up cloudflared access tcp to forward a local port in the"
-                printf '%s\n' "container to a remote host through your Cloudflare tunnel."
-                printf '%s\n' "The forward starts automatically when the container launches."
-                exit 1
-            fi
+                printf '%s\n' "Cloudflare API token (with AI Gateway Read/Edit permissions):"
+                printf '%s\n' "Create at: dash.cloudflare.com > My Profile > API Tokens"
+                printf "  Token: "
+                local token
+                IFS= read -r token 2>/dev/null || true
 
-            mkdir -p "$HOME/.claudebox"
-
-            # Update or create the tunnel env file
-            local existing=""
-            if [[ -f "$tunnel_env" ]]; then
-                existing=$(grep -v '^CF_ACCESS_TCP_FORWARD=' "$tunnel_env" || true)
-            fi
-            {
-                if [[ -n "$existing" ]]; then
-                    printf '%s\n' "$existing"
+                if [[ -z "$token" ]]; then
+                    warn "No token provided. Gateway authentication will fail."
+                    printf '%s\n' "Set it later with: claudebox gateway token <token>"
                 fi
-                printf 'CF_ACCESS_TCP_FORWARD=%s\n' "$forward_spec"
-            } > "${tunnel_env}.tmp" && mv "${tunnel_env}.tmp" "$tunnel_env"
+            else
+                token="$existing_token"
+            fi
 
-            cecho "TCP forward configured: $forward_spec" "$GREEN"
-            printf '%s\n' "On next container start, cloudflared will proxy this connection."
+            {
+                printf 'ANTHROPIC_BASE_URL=%s\n' "$base_url"
+                printf 'ENABLE_TOOL_SEARCH=true\n'
+                if [[ -n "${token:-}" ]]; then
+                    printf 'CF_AIG_TOKEN=%s\n' "$token"
+                fi
+            } > "$gateway_env"
+            chmod 600 "$gateway_env"
+
+            cecho "AI Gateway configured:" "$GREEN"
+            printf "  URL: %s\n" "$base_url"
+            if [[ -n "${token:-}" ]]; then
+                cecho "  Auth token:  saved" "$GREEN"
+            fi
+            printf '\n'
+            printf '%s\n' "All containers will route API traffic through Cloudflare AI Gateway."
+            printf '%s\n' "Restart running containers for the change to take effect."
             ;;
 
         token)
             shift
             local token="${1:-}"
+
             if [[ -z "$token" ]]; then
-                printf "Usage: claudebox tunnel token <cloudflared-token>\n"
+                printf "Usage: claudebox gateway token <cloudflare-api-token>\n"
                 printf '\n'
-                printf '%s\n' "Provide the tunnel connector token from your Cloudflare dashboard."
-                printf '%s\n' "This is for running a tunnel connector (cloudflared tunnel run)."
-                printf '%s\n' "For Access authentication, use 'claudebox tunnel service-token' instead."
+                printf '%s\n' "Set the Cloudflare API token for AI Gateway authentication."
+                printf '%s\n' "Create a token with AI Gateway Read/Edit permissions at:"
+                printf '%s\n' "  dash.cloudflare.com > My Profile > API Tokens"
                 exit 1
             fi
 
-            mkdir -p "$cf_creds_dir"
-            printf '%s' "$token" > "$cf_creds_dir/tunnel-token"
-            chmod 600 "$cf_creds_dir/tunnel-token"
-            cecho "Tunnel connector token saved" "$GREEN"
+            mkdir -p "$HOME/.claudebox"
+
+            if [[ -f "$gateway_env" ]]; then
+                # Preserve existing settings, update token
+                local existing
+                existing=$(grep -v '^CF_AIG_TOKEN=' "$gateway_env" || true)
+                {
+                    if [[ -n "$existing" ]]; then
+                        printf '%s\n' "$existing"
+                    fi
+                    printf 'CF_AIG_TOKEN=%s\n' "$token"
+                } > "${gateway_env}.tmp" && mv "${gateway_env}.tmp" "$gateway_env"
+            else
+                printf 'CF_AIG_TOKEN=%s\n' "$token" > "$gateway_env"
+            fi
+            chmod 600 "$gateway_env"
+
+            cecho "Gateway auth token saved" "$GREEN"
+            ;;
+
+        url)
+            shift
+            local custom_url="${1:-}"
+
+            if [[ -z "$custom_url" ]]; then
+                printf "Usage: claudebox gateway url <base-url>\n"
+                printf '\n'
+                printf "Examples:\n"
+                printf "  claudebox gateway url https://gateway.ai.cloudflare.com/v1/abc123/my-gw/anthropic\n"
+                printf "  claudebox gateway url https://my-proxy.example.com/v1\n"
+                printf '\n'
+                printf '%s\n' "Set a custom ANTHROPIC_BASE_URL for any proxy or gateway."
+                exit 1
+            fi
+
+            mkdir -p "$HOME/.claudebox"
+
+            # Preserve existing token if set
+            local existing_token=""
+            if [[ -f "$gateway_env" ]]; then
+                existing_token=$(grep '^CF_AIG_TOKEN=' "$gateway_env" 2>/dev/null | cut -d= -f2- || true)
+            fi
+
+            {
+                printf 'ANTHROPIC_BASE_URL=%s\n' "$custom_url"
+                printf 'ENABLE_TOOL_SEARCH=true\n'
+                if [[ -n "$existing_token" ]]; then
+                    printf 'CF_AIG_TOKEN=%s\n' "$existing_token"
+                fi
+            } > "$gateway_env"
+            chmod 600 "$gateway_env"
+
+            cecho "API gateway configured:" "$GREEN"
+            printf "  URL: %s\n" "$custom_url"
             ;;
 
         status)
             printf '\n'
-            cecho "Cloudflare Tunnel & Access Configuration:" "$CYAN"
+            cecho "Cloudflare AI Gateway Configuration:" "$CYAN"
             printf '\n'
 
-            # Hostname
-            if [[ -f "$tunnel_env" ]]; then
-                local hostname
-                hostname=$(grep '^CF_ACCESS_HOSTNAME=' "$tunnel_env" 2>/dev/null | cut -d= -f2- || true)
-                if [[ -n "$hostname" ]]; then
-                    printf "  Access hostname: %s\n" "$hostname"
-                fi
-            fi
-
-            # Service token
-            if [[ -f "$tunnel_env" ]] && grep -q '^CF_ACCESS_SERVICE_TOKEN_ID=' "$tunnel_env" 2>/dev/null; then
-                cecho "  Service token:   saved" "$GREEN"
-            else
-                cecho "  Service token:   not set" "$YELLOW"
-            fi
-
-            # TCP forward
-            if [[ -f "$tunnel_env" ]]; then
-                local forward
-                forward=$(grep '^CF_ACCESS_TCP_FORWARD=' "$tunnel_env" 2>/dev/null | cut -d= -f2- || true)
-                if [[ -n "$forward" ]]; then
-                    printf "  TCP forward:     %s\n" "$forward"
+            if [[ -f "$gateway_env" ]]; then
+                local base_url
+                base_url=$(grep '^ANTHROPIC_BASE_URL=' "$gateway_env" 2>/dev/null | cut -d= -f2- || true)
+                if [[ -n "$base_url" ]]; then
+                    printf "  Base URL:        %s\n" "$base_url"
+                    cecho "  Status:          active" "$GREEN"
                 else
-                    cecho "  TCP forward:     not configured" "$YELLOW"
+                    cecho "  Status:          not configured" "$YELLOW"
                 fi
-            fi
 
-            # Tunnel connector token
-            if [[ -f "$cf_creds_dir/tunnel-token" ]]; then
-                cecho "  Connector token: saved" "$GREEN"
+                local has_token
+                has_token=$(grep '^CF_AIG_TOKEN=' "$gateway_env" 2>/dev/null | cut -d= -f2- || true)
+                if [[ -n "$has_token" ]]; then
+                    cecho "  Auth token:      saved" "$GREEN"
+                else
+                    cecho "  Auth token:      not set" "$YELLOW"
+                fi
+
+                local tool_search
+                tool_search=$(grep '^ENABLE_TOOL_SEARCH=' "$gateway_env" 2>/dev/null | cut -d= -f2- || true)
+                if [[ -n "$tool_search" ]]; then
+                    printf "  Tool search:     %s\n" "$tool_search"
+                fi
             else
-                cecho "  Connector token: not set (optional)" "$DIM"
-            fi
-
-            # Config file
-            if [[ -f "$tunnel_config" ]]; then
-                printf "  Config file:     %s\n" "$tunnel_config"
-            fi
-
-            # Profile status
-            local has_tunnel=false
-            local profiles
-            profiles=$(get_current_profiles 2>/dev/null || printf '')
-            if printf '%s' "$profiles" | grep -q 'tunnel'; then
-                has_tunnel=true
-            fi
-
-            if [[ "$has_tunnel" == "true" ]]; then
-                cecho "  Tunnel profile:  enabled" "$GREEN"
-            else
-                cecho "  Tunnel profile:  not added (run 'claudebox add tunnel')" "$YELLOW"
+                cecho "  Status:          not configured (using direct Anthropic API)" "$DIM"
             fi
             printf '\n'
             ;;
 
         clear)
-            rm -f "$tunnel_config"
-            rm -f "$tunnel_env"
-            rm -rf "$cf_creds_dir"
-            cecho "Tunnel configuration cleared" "$YELLOW"
+            rm -f "$gateway_env"
+            cecho "Gateway configuration cleared" "$YELLOW"
+            printf '%s\n' "Containers will connect directly to Anthropic API."
             ;;
 
         *)
             logo_small
             printf '\n'
-            cecho "Cloudflare Tunnel & Access:" "$CYAN"
+            cecho "Cloudflare AI Gateway:" "$CYAN"
             printf '\n'
             cecho "Setup:" "$YELLOW"
-            printf "  ${GREEN}tunnel setup <hostname>${NC}                  Set Access-protected hostname\n"
-            printf "  ${GREEN}tunnel service-token <id> <secret>${NC}      Set service token (headless auth)\n"
-            printf "  ${GREEN}tunnel forward <local>:<host>:<port>${NC}    Auto-forward TCP port in container\n"
-            printf "  ${GREEN}tunnel token <connector-token>${NC}          Set tunnel connector token\n"
+            printf "  ${GREEN}gateway setup <account-id> <gateway-id>${NC}  Configure AI Gateway\n"
+            printf "  ${GREEN}gateway token <api-token>${NC}               Set Cloudflare auth token\n"
+            printf "  ${GREEN}gateway url <base-url>${NC}                  Set custom API proxy URL\n"
             printf '\n'
             cecho "Management:" "$YELLOW"
-            printf "  ${GREEN}tunnel status${NC}                           Show configuration\n"
-            printf "  ${GREEN}tunnel clear${NC}                            Remove all tunnel config\n"
+            printf "  ${GREEN}gateway status${NC}                          Show configuration\n"
+            printf "  ${GREEN}gateway clear${NC}                           Remove gateway config\n"
             printf '\n'
             cecho "How it works:" "$CYAN"
-            printf '%s\n' "  Containers with the 'tunnel' profile get cloudflared installed."
-            printf '%s\n' "  Service tokens enable headless auth (no browser needed)."
-            printf '%s\n' "  Inside the container you can use all cloudflared access commands:"
-            printf '\n'
-            printf "    ${DIM}cloudflared access tcp --hostname app.example.com --url localhost:8080${NC}\n"
-            printf "    ${DIM}cloudflared access curl https://internal.example.com/api${NC}\n"
-            printf "    ${DIM}cloudflared access ssh --hostname ssh.example.com${NC}\n"
+            printf '%s\n' "  Routes all Claude API traffic through Cloudflare AI Gateway."
+            printf '%s\n' "  Provides caching, rate limiting, cost tracking, and logging."
+            printf '%s\n' "  Requires a Cloudflare API token with AI Gateway permissions."
             printf '\n'
             cecho "Quick start:" "$YELLOW"
-            printf "  1. ${CYAN}claudebox tunnel setup internal.example.com${NC}\n"
-            printf "  2. ${CYAN}claudebox tunnel service-token <id> <secret>${NC}\n"
-            printf "  3. ${CYAN}claudebox tunnel forward 8080:internal.example.com:443${NC}  (optional)\n"
-            printf "  4. ${CYAN}claudebox add tunnel${NC}\n"
-            printf "  5. ${CYAN}claudebox rebuild${NC}\n"
+            printf "  1. Create an AI Gateway in Cloudflare dashboard (AI > AI Gateway)\n"
+            printf "  2. Create an API token at: My Profile > API Tokens\n"
+            printf "     ${DIM}(Permissions: AI Gateway Read + Edit)${NC}\n"
+            printf "  3. ${CYAN}claudebox gateway setup <account-id> <gateway-id>${NC}\n"
+            printf "  4. ${CYAN}claudebox rebuild${NC}\n"
             printf '\n'
             ;;
     esac
 }
 
-export -f _cmd_auth _cmd_tunnel
+export -f _cmd_auth _cmd_gateway

@@ -27,15 +27,14 @@ get_profile_packages() {
         javascript) echo "" ;;  # Installed via nvm
         java) echo "" ;;  # Java installed via SDKMan, build tools in profile function
         ruby) echo "ruby-full ruby-dev libreadline-dev libyaml-dev libsqlite3-dev sqlite3 libxml2-dev libxslt1-dev libcurl4-openssl-dev software-properties-common" ;;
-        php) echo "php php-cli php-fpm php-mysql php-pgsql php-sqlite3 php-curl php-gd php-mbstring php-xml php-zip composer" ;;
-        database) echo "postgresql-client mysql-client sqlite3 redis-tools mongodb-clients" ;;
-        devops) echo "docker.io docker-compose kubectl helm terraform ansible awscli" ;;
+        php) echo "php php-cli php-fpm php-mysql php-pgsql php-sqlite3 php-curl php-gd php-mbstring php-xml php-zip" ;;  # composer installed via binary
+        database) echo "postgresql-client default-mysql-client sqlite3 redis-tools" ;;  # mongosh installed via binary
+        devops) echo "ansible" ;;  # Other tools installed via binary downloads
         web) echo "nginx apache2-utils httpie" ;;
         embedded) echo "gcc-arm-none-eabi gdb-multiarch openocd picocom minicom screen" ;;
         datascience) echo "r-base" ;;
         security) echo "nmap tcpdump wireshark-common netcat-openbsd john hashcat hydra" ;;
         ml) echo "" ;;  # Just cmake needed, comes from build-tools now
-        tunnel) echo "" ;;  # Installed via deb package
         *) echo "" ;;
     esac
 }
@@ -86,7 +85,7 @@ expand_profile() {
         c) echo "core build-tools c" ;;
         openwrt) echo "core build-tools openwrt" ;;
         ml) echo "core build-tools ml" ;;
-        rust|go|flutter|python|php|ruby|java|database|devops|web|embedded|datascience|security|javascript|tunnel)
+        rust|go|flutter|python|php|ruby|java|database|devops|web|embedded|datascience|security|javascript)
             echo "core $1"
             ;;
         shell|networking|build-tools|core)
@@ -334,23 +333,49 @@ get_profile_ruby() {
 
 get_profile_php() {
     local packages=$(get_profile_packages "php")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
+    cat << 'EOF'
+RUN apt-get update && apt-get install -y php php-cli php-fpm php-mysql php-pgsql php-sqlite3 php-curl php-gd php-mbstring php-xml php-zip && apt-get clean
+# Composer
+RUN curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+EOF
 }
 
 get_profile_database() {
     local packages=$(get_profile_packages "database")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
+    cat << 'EOF'
+RUN apt-get update && apt-get install -y postgresql-client default-mysql-client sqlite3 redis-tools && apt-get clean
+# mongosh
+RUN curl -fsSL https://downloads.mongodb.com/compass/mongosh-2.2.1-linux-x64.tgz -o /tmp/mongosh.tgz && \
+    tar -xzf /tmp/mongosh.tgz -C /tmp && \
+    cp /tmp/mongosh-*/bin/mongosh /usr/local/bin/ && \
+    rm -rf /tmp/mongosh*
+EOF
 }
 
 get_profile_devops() {
     local packages=$(get_profile_packages "devops")
-    if [[ -n "$packages" ]]; then
-        echo "RUN apt-get update && apt-get install -y $packages && apt-get clean"
-    fi
+    cat << 'EOF'
+# Devops apt packages
+RUN apt-get update && apt-get install -y ansible && apt-get clean
+# Docker CLI
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y docker-ce-cli docker-compose-plugin && apt-get clean
+# kubectl
+RUN curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/$(dpkg --print-architecture)/kubectl" && \
+    chmod +x /usr/local/bin/kubectl
+# Helm
+RUN curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Terraform
+RUN curl -fsSL https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_$(dpkg --print-architecture).zip -o /tmp/terraform.zip && \
+    unzip -o /tmp/terraform.zip -d /usr/local/bin && \
+    rm -f /tmp/terraform.zip
+# AWS CLI v2
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip && \
+    unzip -o /tmp/awscliv2.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/awscliv2.zip /tmp/aws
+EOF
 }
 
 get_profile_web() {
@@ -391,14 +416,6 @@ get_profile_ml() {
     printf '%s\n' "# ML profile uses build-tools for compilation"
 }
 
-get_profile_tunnel() {
-    cat << 'EOF'
-# Install cloudflared for Cloudflare Tunnel access
-RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb && \
-    dpkg -i /tmp/cloudflared.deb && \
-    rm -f /tmp/cloudflared.deb
-EOF
-}
 
 # -------- Custom profile support -----------------------------------------------
 # Users can add custom profiles as shell scripts in ~/.claudebox/custom-profiles/
@@ -476,7 +493,7 @@ profile_exists() {
 
 # Override get_all_profile_names to include custom profiles
 _builtin_profile_names() {
-    printf '%s' "core build-tools shell networking c openwrt rust python go flutter javascript java ruby php database devops web embedded datascience security ml tunnel"
+    printf '%s' "core build-tools shell networking c openwrt rust python go flutter javascript java ruby php database devops web embedded datascience security ml"
 }
 
 get_all_profile_names() {
@@ -515,7 +532,6 @@ _builtin_profile_description() {
         datascience) printf '%s' "Data Science (Python, Jupyter, R)" ;;
         security) printf '%s' "Security Tools (scanners, crackers, packet tools)" ;;
         ml) printf '%s' "Machine Learning (build layer only; Python via uv)" ;;
-        tunnel) printf '%s' "Cloudflare Tunnel (cloudflared for private network access)" ;;
         *) printf '' ;;
     esac
 }
@@ -535,6 +551,6 @@ export -f get_profile_file_path read_config_value read_profile_section update_pr
 export -f get_profile_core get_profile_build_tools get_profile_shell get_profile_networking get_profile_c get_profile_openwrt
 export -f get_profile_rust get_profile_python get_profile_go get_profile_flutter get_profile_javascript get_profile_java get_profile_ruby
 export -f get_profile_php get_profile_database get_profile_devops get_profile_web get_profile_embedded get_profile_datascience
-export -f get_profile_security get_profile_ml get_profile_tunnel
+export -f get_profile_security get_profile_ml
 export -f get_custom_profile_names custom_profile_exists get_custom_profile get_custom_profile_description
 export -f _builtin_profile_exists _builtin_profile_names _builtin_profile_description

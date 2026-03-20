@@ -64,11 +64,11 @@ source "${LIB_DIR}/commands.clean.sh"
 source "${LIB_DIR}/commands.system.sh"
 
 # ============================================================================
-# AUTH & TUNNEL COMMANDS - Authentication and network tunnel management
+# AUTH & GATEWAY COMMANDS - Authentication and API gateway management
 # ============================================================================
-# Commands: auth, tunnel
+# Commands: auth, gateway
 # - auth: Manages persistent auth tokens across slots
-# - tunnel: Configures Cloudflare tunnel for private network access
+# - gateway: Configures Cloudflare AI Gateway for API routing
 source "${LIB_DIR}/commands.auth.sh"
 
 # ============================================================================
@@ -78,6 +78,14 @@ source "${LIB_DIR}/commands.auth.sh"
 # - agent: Manages Claude Code plugins and ClaudeBox command agents
 # - Wraps the native plugin system for ephemeral container persistence
 source "${LIB_DIR}/commands.agent.sh"
+
+# ============================================================================
+# SELF-MANAGEMENT COMMANDS - Install, reinstall, uninstall
+# ============================================================================
+# Commands: reinstall, uninstall
+# - reinstall: Cleans Docker resources and source, preserves projects/settings
+# - uninstall: Fully removes ClaudeBox from the system
+source "${LIB_DIR}/commands.self.sh"
 
 # ============================================================================
 # SETUP COMMANDS - Interactive setup wizard
@@ -177,13 +185,15 @@ show_help() {
   project <name>                  Open project by name/hash from anywhere
   tmux                            Launch ClaudeBox with tmux support enabled
   auth                            Manage persistent auth tokens
-  tunnel                          Configure Cloudflare tunnel access
+  gateway                         Configure Cloudflare AI Gateway
   mcp install <server>            Install an MCP server into the image
   mcp list                        List known/installed MCP servers
   doctor                          Run diagnostic health checks
   snapshot [name]                 Save current slot state
   snapshot list                   List saved snapshots
-  snapshot restore <name>         Restore a snapshot to a slot"
+  snapshot restore <name>         Restore a snapshot to a slot
+  reinstall                       Clean Docker resources and rebuild from scratch
+  uninstall                       Fully remove ClaudeBox from the system"
     
     # Check if we're in a project directory
     local project_folder_name
@@ -298,7 +308,9 @@ show_full_help() {
   tmux                            Launch ClaudeBox with tmux support enabled\
   doctor                          Run diagnostic health checks\
   snapshot [name]                 Save current slot state\
-  snapshot restore <name>         Restore a snapshot to a slot')
+  snapshot restore <name>         Restore a snapshot to a slot\
+  reinstall                       Clean Docker resources and rebuild from scratch\
+  uninstall                       Fully remove ClaudeBox from the system')
         
         # Output everything at once
         echo
@@ -365,10 +377,14 @@ dispatch_command() {
         import)           _cmd_import "$@" ;;
         kill)             _cmd_kill "$@" ;;
         auth)             _cmd_auth "$@" ;;
-        tunnel)           _cmd_tunnel "$@" ;;
+        gateway)          _cmd_gateway "$@" ;;
         
         # VM management
         vm)               _cmd_vm "$@" ;;
+
+        # Self-management
+        reinstall)        _cmd_reinstall "$@" ;;
+        uninstall)        _cmd_uninstall "$@" ;;
 
         # Setup wizard
         setup)            _cmd_setup "$@" ;;

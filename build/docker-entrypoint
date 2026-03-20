@@ -213,29 +213,6 @@ fi
 
 cd /home/DOCKERUSER
 
-# Start cloudflared access tcp proxy if configured
-if [ -n "${CF_ACCESS_TCP_FORWARD:-}" ] && command -v cloudflared >/dev/null 2>&1; then
-    # Parse forward spec: local_port:remote_host:remote_port
-    CF_LOCAL_PORT="${CF_ACCESS_TCP_FORWARD%%:*}"
-    CF_REMOTE="${CF_ACCESS_TCP_FORWARD#*:}"
-
-    if [ -n "$CF_LOCAL_PORT" ] && [ -n "$CF_REMOTE" ] && [ -n "${CF_ACCESS_HOSTNAME:-}" ]; then
-        CF_ACCESS_ARGS="--hostname ${CF_ACCESS_HOSTNAME} --url localhost:${CF_LOCAL_PORT}"
-
-        # Add service token auth if available
-        if [ -n "${CF_ACCESS_CLIENT_ID:-}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET:-}" ]; then
-            CF_ACCESS_ARGS="$CF_ACCESS_ARGS --service-token-id ${CF_ACCESS_CLIENT_ID} --service-token-secret ${CF_ACCESS_CLIENT_SECRET}"
-        fi
-
-        # Start cloudflared access tcp in background as the container user
-        runuser -u DOCKERUSER -- bash -c "cloudflared access tcp $CF_ACCESS_ARGS >/dev/null 2>&1 &"
-
-        if [ "${VERBOSE:-false}" = "true" ]; then
-            echo "Started cloudflared access tcp proxy: localhost:${CF_LOCAL_PORT} -> ${CF_ACCESS_HOSTNAME}" >&2
-        fi
-    fi
-fi
-
 # No need for complex exit handlers - just copy after claude exits
 
 if [[ "${SHELL_MODE:-false}" == "true" ]]; then

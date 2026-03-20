@@ -254,22 +254,6 @@ run_claudebox_container() {
         fi
     fi
 
-    # Mount tunnel config if it exists
-    local tunnel_config="$HOME/.claudebox/tunnel.yml"
-    if [[ -f "$tunnel_config" ]]; then
-        docker_args+=(-v "$tunnel_config":"/home/$DOCKER_USER/.cloudflared/config.yml":ro)
-        if [[ "$VERBOSE" == "true" ]]; then
-            printf '[DEBUG] Mounting cloudflared tunnel config\n' >&2
-        fi
-    fi
-    # Mount cloudflared credentials if they exist
-    local cf_creds_dir="$HOME/.claudebox/cloudflared"
-    if [[ -d "$cf_creds_dir" ]]; then
-        docker_args+=(-v "$cf_creds_dir":"/home/$DOCKER_USER/.cloudflared":ro)
-        if [[ "$VERBOSE" == "true" ]]; then
-            printf '[DEBUG] Mounting cloudflared credentials directory\n' >&2
-        fi
-    fi
     
     # Mount .env file if it exists in the project directory
     if [[ -f "$PROJECT_DIR/.env" ]]; then
@@ -412,25 +396,20 @@ run_claudebox_container() {
     fi
     
     
-    # Load Cloudflare Access / tunnel config from tunnel.env
-    local cf_access_hostname=""
-    local cf_access_token_id=""
-    local cf_access_token_secret=""
-    local cf_access_tcp_forward=""
-    if [[ -f "$HOME/.claudebox/tunnel.env" ]]; then
+    # Load Cloudflare AI Gateway config
+    local gateway_base_url=""
+    local gateway_tool_search=""
+    local gateway_custom_headers=""
+    if [[ -f "$HOME/.claudebox/gateway.env" ]]; then
         local _line
-        _line=$(grep '^CF_ACCESS_HOSTNAME=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
-        if [[ -n "$_line" ]]; then cf_access_hostname="${_line#CF_ACCESS_HOSTNAME=}"; fi
-        _line=$(grep '^CF_ACCESS_SERVICE_TOKEN_ID=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
-        if [[ -n "$_line" ]]; then cf_access_token_id="${_line#CF_ACCESS_SERVICE_TOKEN_ID=}"; fi
-        _line=$(grep '^CF_ACCESS_SERVICE_TOKEN_SECRET=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
-        if [[ -n "$_line" ]]; then cf_access_token_secret="${_line#CF_ACCESS_SERVICE_TOKEN_SECRET=}"; fi
-        _line=$(grep '^CF_ACCESS_TCP_FORWARD=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
-        if [[ -n "$_line" ]]; then cf_access_tcp_forward="${_line#CF_ACCESS_TCP_FORWARD=}"; fi
-        # Legacy TUNNEL_URL support
-        if [[ -z "${TUNNEL_URL:-}" ]]; then
-            _line=$(grep '^TUNNEL_URL=' "$HOME/.claudebox/tunnel.env" 2>/dev/null || true)
-            if [[ -n "$_line" ]]; then TUNNEL_URL="${_line#TUNNEL_URL=}"; fi
+        _line=$(grep '^ANTHROPIC_BASE_URL=' "$HOME/.claudebox/gateway.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then gateway_base_url="${_line#ANTHROPIC_BASE_URL=}"; fi
+        _line=$(grep '^ENABLE_TOOL_SEARCH=' "$HOME/.claudebox/gateway.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then gateway_tool_search="${_line#ENABLE_TOOL_SEARCH=}"; fi
+        _line=$(grep '^CF_AIG_TOKEN=' "$HOME/.claudebox/gateway.env" 2>/dev/null || true)
+        if [[ -n "$_line" ]]; then
+            local cf_token="${_line#CF_AIG_TOKEN=}"
+            gateway_custom_headers="cf-aig-authorization: Bearer ${cf_token}"
         fi
     fi
 
@@ -454,11 +433,9 @@ run_claudebox_container() {
         -e "CLAUDEBOX_WRAP_TMUX=${CLAUDEBOX_WRAP_TMUX:-false}"
         -e "CLAUDEBOX_PANE_NAME=${CLAUDEBOX_PANE_NAME:-}"
         -e "CLAUDEBOX_TMUX_PANE=${CLAUDEBOX_TMUX_PANE:-}"
-        -e "TUNNEL_URL=${TUNNEL_URL:-}"
-        -e "CF_ACCESS_HOSTNAME=${cf_access_hostname}"
-        -e "CF_ACCESS_CLIENT_ID=${cf_access_token_id}"
-        -e "CF_ACCESS_CLIENT_SECRET=${cf_access_token_secret}"
-        -e "CF_ACCESS_TCP_FORWARD=${cf_access_tcp_forward}"
+        -e "ANTHROPIC_BASE_URL=${gateway_base_url}"
+        -e "ANTHROPIC_CUSTOM_HEADERS=${gateway_custom_headers}"
+        -e "ENABLE_TOOL_SEARCH=${gateway_tool_search}"
         --cap-add NET_ADMIN
         --cap-add NET_RAW
     )

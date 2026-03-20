@@ -30,7 +30,11 @@
       "Bash(do bash:*)",
       "Bash(printf '%s: syntax OK\\\\n' \"$f\")",
       "Bash(printf '%s: SYNTAX ERROR\\\\n' \"$f\")",
-      "Bash(done)"
+      "Bash(done)",
+      "WebFetch(domain:colima.run)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebFetch(domain:docs.anthropic.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

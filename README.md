@@ -3,7 +3,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Docker-based development environment for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Runs Claude in isolated containers with development profiles, MCP server management, multi-slot parallel instances, and Cloudflare tunnel support.
+Docker-based development environment for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Runs Claude in isolated containers with development profiles, MCP server management, multi-slot parallel instances, and Cloudflare AI Gateway support.
 
 ## Install
 
@@ -62,7 +62,6 @@ claudebox remove rust           # Remove a profile
 | `datascience` | R, Jupyter, NumPy, pandas, scikit-learn (via uv) |
 | `security` | nmap, tcpdump, Wireshark, netcat, John, Hashcat |
 | `ml` | PyTorch, transformers, scikit-learn (via uv) |
-| `tunnel` | cloudflared for Cloudflare Tunnel / Access |
 
 ### Custom Profiles
 
@@ -161,27 +160,23 @@ claudebox auth status           # Check token status
 claudebox auth clear            # Remove saved token
 ```
 
-## Cloudflare Tunnel
+## Cloudflare AI Gateway
 
-Access services on your private LAN from inside containers via Cloudflare Access:
-
-```bash
-claudebox tunnel setup internal.example.com
-claudebox tunnel service-token <id> <secret>    # Headless auth (no browser)
-claudebox tunnel forward 8080:api.lan:443       # Auto-proxy on container start
-claudebox add tunnel                            # Install cloudflared
-claudebox rebuild
-```
-
-Inside the container, all `cloudflared access` commands work:
+Route all Claude API traffic through Cloudflare AI Gateway for caching, rate limiting, cost tracking, and logging:
 
 ```bash
-cloudflared access tcp --hostname app.example.com --url localhost:8080
-cloudflared access curl https://internal.example.com/api
-cloudflared access ssh --hostname ssh.example.com
+claudebox gateway setup <account-id> <gateway-id>   # Configure AI Gateway
+claudebox gateway status                             # Show configuration
+claudebox gateway clear                              # Remove gateway config
 ```
 
-Service tokens (`--service-token-id` / `--service-token-secret`) are injected automatically when configured.
+Or set a custom API proxy URL directly:
+
+```bash
+claudebox gateway url https://my-proxy.example.com/v1
+```
+
+Create an AI Gateway in your Cloudflare dashboard under AI > AI Gateway. The account ID is in your Cloudflare dashboard URL; the gateway ID is the name you chose when creating the gateway.
 
 ## Commands
 
@@ -209,8 +204,8 @@ claudebox slot <n>                  Launch specific slot
 claudebox kill [all|hash]           Stop containers
 
 claudebox auth save                 Save auth token persistently
-claudebox tunnel setup <host>       Configure tunnel endpoint
-claudebox tunnel service-token ...  Set Access service token
+claudebox gateway setup <id> <gw>   Configure Cloudflare AI Gateway
+claudebox gateway url <url>        Set custom API proxy URL
 
 claudebox info                      Show project/system info
 claudebox projects                  List all ClaudeBox projects
@@ -254,7 +249,7 @@ Named containers use `--rm` for automatic cleanup. Slot directories on the host 
       .config/                      # Tool configs
       .cache/                       # Caches
   auth/credentials.json             # Persistent auth token
-  cloudflared/                      # Tunnel credentials
+  gateway.env                       # AI Gateway configuration
   mcp-config.json                   # Installed MCP server configs
   mcp-servers.ini                   # Installed server tracking
   custom-profiles/                  # User-defined profiles

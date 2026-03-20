@@ -2,322 +2,260 @@
 # Setup Command - Interactive setup wizard
 # ============================================================================
 # Command: setup
-# Guides users through initial ClaudeBox configuration
+# Launches the Python TUI wizard, then applies the selected configuration.
+# Falls back to a minimal Bash flow if Python 3 is not available.
 
-# Read a single character of input (portable)
-_setup_read_char() {
-    local char=""
-    IFS= read -r -n 1 char 2>/dev/null || true
-    printf '%s' "$char"
-}
+# ── Apply results from the Python wizard ──────────────────────
+# Reads KEY=value lines from a file and executes the corresponding actions.
+_setup_apply_results() {
+    local result_file="$1"
 
-# Ask a yes/no question, return 0 for yes, 1 for no
-_setup_ask_yn() {
-    local prompt="$1"
-    local default="${2:-n}"
-    local hint="y/N"
-    if [[ "$default" == "y" ]]; then
-        hint="Y/n"
+    # Parse result file into variables
+    local profiles="" create_slot="" gateway_enabled=""
+    local gateway_account_id="" gateway_id="" gateway_token=""
+    local plugins="" enable_sudo="" disable_firewall=""
+
+    while IFS='=' read -r key value; do
+        case "$key" in
+            PROFILES)           profiles="$value" ;;
+            CREATE_SLOT)        create_slot="$value" ;;
+            GATEWAY_ENABLED)    gateway_enabled="$value" ;;
+            GATEWAY_ACCOUNT_ID) gateway_account_id="$value" ;;
+            GATEWAY_ID)         gateway_id="$value" ;;
+            GATEWAY_TOKEN)      gateway_token="$value" ;;
+            PLUGINS)            plugins="$value" ;;
+            ENABLE_SUDO)        enable_sudo="$value" ;;
+            DISABLE_FIREWALL)   disable_firewall="$value" ;;
+        esac
+    done < "$result_file"
+
+    # 1) Profiles
+    if [[ -n "$profiles" ]]; then
+        init_project_dir "$PROJECT_DIR"
+        local profile_file
+        profile_file=$(get_profile_file_path)
+        # shellcheck disable=SC2086
+        update_profile_section "$profile_file" "profiles" $profiles
+        success "  Added profiles: $profiles"
     fi
 
-    printf "  %s [%s] " "$prompt" "$hint"
-    local answer
-    IFS= read -r answer 2>/dev/null || true
-    answer="${answer:-$default}"
+    # 2) Create slot
+    if [[ "$create_slot" == "yes" ]]; then
+        local slot_name
+        slot_name=$(create_container "$PROJECT_DIR")
+        success "  Slot created: $slot_name"
+    fi
 
-    case "$answer" in
-        [yY]|[yY][eE][sS]) return 0 ;;
-        *) return 1 ;;
-    esac
-}
+    # 3) AI Gateway
+    if [[ "$gateway_enabled" == "yes" ]] && [[ -n "$gateway_account_id" ]] && [[ -n "$gateway_id" ]]; then
+        local gateway_env="$HOME/.claudebox/gateway.env"
+        mkdir -p "$HOME/.claudebox"
 
-# Print a section header
-_setup_header() {
-    local step="$1"
-    local total="$2"
-    local title="$3"
-    printf '\n'
-    printf "  ${CYAN}Step %s of %s: %s${NC}\n" "$step" "$total" "$title"
-    printf "  ${DIM}────────────────────────────────────────────────────────────────${NC}\n"
-    printf '\n'
-}
+        local base_url="https://gateway.ai.cloudflare.com/v1/${gateway_account_id}/${gateway_id}/anthropic"
+        {
+            printf 'ANTHROPIC_BASE_URL=%s\n' "$base_url"
+            printf 'ENABLE_TOOL_SEARCH=true\n'
+            if [[ -n "$gateway_token" ]]; then
+                printf 'CF_AIG_TOKEN=%s\n' "$gateway_token"
+            fi
+        } > "$gateway_env"
+        chmod 600 "$gateway_env"
 
-# Interactive profile selector
-_setup_profiles() {
-    _setup_header 1 5 "Development Profiles"
+        success "  AI Gateway configured: $base_url"
+    fi
 
-    printf "  Select profiles to install. Type profile names separated by spaces,\n"
-    printf "  or press Enter to skip.\n"
-    printf '\n'
+    # 4) Plugins
+    if [[ -n "$plugins" ]]; then
+        for plugin_name in $plugins; do
+            printf "  Installing plugin: %s\n" "$plugin_name"
+            _agent_run_in_container "install" "$plugin_name" 2>/dev/null || true
+        done
+        success "  Plugins installed"
+    fi
 
-    # Show available profiles in columns
-    local profiles=()
-    while IFS= read -r p; do
-        if [[ -n "$p" ]]; then
-            profiles+=("$p")
+    # 5) Default flags
+    local flags_to_save=""
+    if [[ "$enable_sudo" == "yes" ]]; then
+        flags_to_save="--enable-sudo"
+    fi
+    if [[ "$disable_firewall" == "yes" ]]; then
+        if [[ -n "$flags_to_save" ]]; then
+            flags_to_save="$flags_to_save --disable-firewall"
+        else
+            flags_to_save="--disable-firewall"
         fi
-    done < <(_builtin_profile_names | tr ' ' '\n')
+    fi
 
-    for profile in "${profiles[@]}"; do
-        local desc
-        desc=$(get_profile_description "$profile")
-        printf "    ${GREEN}%-15s${NC} %s\n" "$profile" "$desc"
+    if [[ -n "$flags_to_save" ]]; then
+        local flags_file="$HOME/.claudebox/default-flags"
+        mkdir -p "$HOME/.claudebox"
+        for flag in $flags_to_save; do
+            printf '%s\n' "$flag"
+        done > "$flags_file"
+        success "  Saved default flags: $flags_to_save"
+    fi
+}
+
+# ── Build the config blob that the Python wizard reads from stdin ──
+_setup_build_config() {
+    printf '[profiles]\n'
+    for p in $(_builtin_profile_names); do
+        if [[ -n "$p" ]]; then
+            local desc
+            desc=$(get_profile_description "$p")
+            printf '%s|%s\n' "$p" "$desc"
+        fi
     done
 
-    # Show custom profiles if any
+    # Custom profiles
     local custom_names
     custom_names=$(get_custom_profile_names 2>/dev/null || true)
     if [[ -n "$custom_names" ]]; then
-        printf '\n'
-        printf "  ${DIM}Custom profiles:${NC}\n"
-        for profile in $custom_names; do
+        for p in $custom_names; do
             local desc
-            desc=$(get_custom_profile_description "$profile")
-            printf "    ${GREEN}%-15s${NC} %s\n" "$profile" "$desc"
+            desc=$(get_custom_profile_description "$p")
+            printf '%s|%s\n' "$p" "$desc"
         done
     fi
 
-    printf '\n'
-    printf "  ${WHITE}Profiles to add:${NC} "
-    local input
-    IFS= read -r input 2>/dev/null || true
-
-    if [[ -n "$input" ]]; then
-        local valid_profiles=()
-        local invalid_profiles=()
-        for name in $input; do
-            if profile_exists "$name"; then
-                valid_profiles+=("$name")
-            else
-                invalid_profiles+=("$name")
-            fi
-        done
-
-        if [[ ${#invalid_profiles[@]} -gt 0 ]]; then
-            warn "  Unknown profiles (skipped): ${invalid_profiles[*]}"
-        fi
-
-        if [[ ${#valid_profiles[@]} -gt 0 ]]; then
-            # Add profiles to the project
-            init_project_dir "$PROJECT_DIR"
-            local profile_file
-            profile_file=$(get_profile_file_path)
-            update_profile_section "$profile_file" "profiles" "${valid_profiles[@]}"
-            success "  Added profiles: ${valid_profiles[*]}"
-        fi
-    else
-        printf "  ${DIM}Skipped${NC}\n"
-    fi
+    printf '[plugins]\n'
+    printf 'commit-commands|Git commit, push, and PR creation\n'
+    printf 'github|Official GitHub MCP server\n'
+    printf 'typescript-lsp|TypeScript/JavaScript intelligence\n'
+    printf 'pyright-lsp|Python type checking\n'
+    printf 'context7|Version-specific library docs\n'
+    printf 'security-guidance|Security issue warnings\n'
 }
 
-# Create first slot
-_setup_create_slot() {
-    _setup_header 2 5 "Create Container Slot"
-
-    printf "  A slot is an authenticated Claude instance. You need at least one\n"
-    printf "  to use ClaudeBox. You can create more later with 'claudebox create'.\n"
-    printf '\n'
-
-    if _setup_ask_yn "Create your first slot now?" "y"; then
-        printf '\n'
-        local slot_name
-        slot_name=$(create_container "$PROJECT_DIR")
-        printf '\n'
-        success "  Slot created: $slot_name"
-        printf "  ${DIM}Run 'claudebox' to authenticate and start using Claude.${NC}\n"
-    else
-        printf '\n'
-        printf "  ${DIM}Skipped. Run 'claudebox create' when you're ready.${NC}\n"
-    fi
-}
-
-# Cloudflare tunnel configuration
-_setup_tunnel() {
-    _setup_header 3 5 "Cloudflare Tunnel (optional)"
-
-    printf "  If you need containers to access services on a private network\n"
-    printf "  via Cloudflare Access, configure it here.\n"
-    printf '\n'
-
-    if ! _setup_ask_yn "Set up Cloudflare tunnel access?"; then
-        printf '\n'
-        printf "  ${DIM}Skipped. Run 'claudebox tunnel' later if needed.${NC}\n"
-        return 0
-    fi
-
-    printf '\n'
-    local tunnel_env="$HOME/.claudebox/tunnel.env"
-    local cf_creds_dir="$HOME/.claudebox/cloudflared"
-
-    # Hostname
-    printf "  ${WHITE}Access-protected hostname${NC} (e.g. internal.example.com)\n"
-    printf "  ${WHITE}Hostname:${NC} "
-    local hostname
-    IFS= read -r hostname 2>/dev/null || true
-
-    if [[ -z "$hostname" ]]; then
-        warn "  No hostname provided, skipping tunnel setup."
-        return 0
-    fi
-
-    mkdir -p "$HOME/.claudebox" "$cf_creds_dir"
-    printf 'CF_ACCESS_HOSTNAME=%s\n' "$hostname" > "$tunnel_env"
-
-    # Service token
-    printf '\n'
-    printf "  ${DIM}Service tokens enable headless auth (no browser needed).${NC}\n"
-    printf "  ${DIM}Create one in: Cloudflare Zero Trust > Access > Service Auth > Service Tokens${NC}\n"
-    printf '\n'
-
-    if _setup_ask_yn "Add a service token?"; then
-        printf "  ${WHITE}Client ID:${NC} "
-        local token_id
-        IFS= read -r token_id 2>/dev/null || true
-
-        printf "  ${WHITE}Client Secret:${NC} "
-        local token_secret
-        IFS= read -r token_secret 2>/dev/null || true
-
-        if [[ -n "$token_id" ]] && [[ -n "$token_secret" ]]; then
-            {
-                cat "$tunnel_env"
-                printf 'CF_ACCESS_SERVICE_TOKEN_ID=%s\n' "$token_id"
-                printf 'CF_ACCESS_SERVICE_TOKEN_SECRET=%s\n' "$token_secret"
-            } > "${tunnel_env}.tmp" && mv "${tunnel_env}.tmp" "$tunnel_env"
-            chmod 600 "$tunnel_env"
-            success "  Service token saved"
-        else
-            warn "  Incomplete token, skipping."
-        fi
-    fi
-
-    # TCP forward
-    printf '\n'
-    if _setup_ask_yn "Set up TCP port forwarding?"; then
-        printf "  ${DIM}Format: local-port:remote-host:remote-port${NC}\n"
-        printf "  ${DIM}Example: 8080:api.internal:443${NC}\n"
-        printf "  ${WHITE}Forward:${NC} "
-        local forward_spec
-        IFS= read -r forward_spec 2>/dev/null || true
-
-        if [[ -n "$forward_spec" ]]; then
-            {
-                cat "$tunnel_env"
-                printf 'CF_ACCESS_TCP_FORWARD=%s\n' "$forward_spec"
-            } > "${tunnel_env}.tmp" && mv "${tunnel_env}.tmp" "$tunnel_env"
-            success "  TCP forward configured: $forward_spec"
-        fi
-    fi
-
-    # Auto-add tunnel profile
-    printf '\n'
-    init_project_dir "$PROJECT_DIR"
-    local profile_file
-    profile_file=$(get_profile_file_path)
-    local current
-    current=$(get_current_profiles 2>/dev/null || true)
-
-    if ! printf '%s' "$current" | grep -q 'tunnel'; then
-        if _setup_ask_yn "Add the 'tunnel' profile to install cloudflared?" "y"; then
-            update_profile_section "$profile_file" "profiles" "tunnel"
-            success "  Tunnel profile added"
-        fi
-    else
-        printf "  ${DIM}Tunnel profile already enabled.${NC}\n"
-    fi
-}
-
-# Plugin recommendations
-_setup_plugins() {
-    _setup_header 4 5 "Plugins (optional)"
-
-    printf "  Claude Code has 100+ plugins available. Here are some popular ones:\n"
-    printf '\n'
-    printf "    ${GREEN}%-24s${NC} %s\n" "commit-commands" "Git commit, push, and PR creation"
-    printf "    ${GREEN}%-24s${NC} %s\n" "github" "Official GitHub MCP server"
-    printf "    ${GREEN}%-24s${NC} %s\n" "typescript-lsp" "TypeScript/JavaScript intelligence"
-    printf "    ${GREEN}%-24s${NC} %s\n" "pyright-lsp" "Python type checking"
-    printf "    ${GREEN}%-24s${NC} %s\n" "context7" "Version-specific library docs"
-    printf "    ${GREEN}%-24s${NC} %s\n" "security-guidance" "Security issue warnings"
-    printf '\n'
-    printf "  ${DIM}Type plugin names separated by spaces to install, or Enter to skip.${NC}\n"
-    printf "  ${DIM}Run 'claudebox agent popular' later to see more options.${NC}\n"
-    printf '\n'
-    printf "  ${WHITE}Plugins to install:${NC} "
-    local input
-    IFS= read -r input 2>/dev/null || true
-
-    if [[ -n "$input" ]]; then
-        for plugin_name in $input; do
-            printf "  Installing %s...\n" "$plugin_name"
-            _agent_run_in_container "install" "$plugin_name" 2>/dev/null || true
-        done
-        success "  Plugin installation complete"
-    else
-        printf "  ${DIM}Skipped. Run 'claudebox agent install <name>' later.${NC}\n"
-    fi
-}
-
-# Default settings
-_setup_defaults() {
-    _setup_header 5 5 "Default Settings"
-
-    local flags_to_save=()
-
-    if _setup_ask_yn "Enable sudo in containers by default?"; then
-        flags_to_save+=("--enable-sudo")
-    fi
-
-    printf '\n'
-    if _setup_ask_yn "Disable firewall by default?"; then
-        flags_to_save+=("--disable-firewall")
-    fi
-
-    if [[ ${#flags_to_save[@]} -gt 0 ]]; then
-        local flags_file="$HOME/.claudebox/default-flags"
-        mkdir -p "$HOME/.claudebox"
-        printf '%s\n' "${flags_to_save[@]}" > "$flags_file"
-        printf '\n'
-        success "  Saved default flags: ${flags_to_save[*]}"
-    else
-        printf '\n'
-        printf "  ${DIM}Using default settings.${NC}\n"
-    fi
-}
-
-# Main setup wizard
-_cmd_setup() {
+# ── Minimal Bash fallback (no Python 3 available) ────────────
+_setup_fallback() {
     logo_small
     printf '\n'
-    cecho "  ClaudeBox Setup Wizard" "$WHITE"
-    printf "  ${DIM}Configure your development environment step by step.${NC}\n"
-    printf "  ${DIM}Press Enter at any prompt to skip that step.${NC}\n"
+    cecho "  ClaudeBox Setup (basic mode)" "$WHITE"
+    printf "  ${DIM}Install Python 3 for the full interactive wizard.${NC}\n"
+    printf "  ${DIM}Press Enter at any prompt to skip that step.${NC}\n\n"
 
-    # Ensure project dir is initialized for profile operations
+    # Profiles
+    printf "  ${CYAN}Profiles${NC} – enter names separated by spaces:\n"
+    local profile_list
+    profile_list=$(_builtin_profile_names)
+    printf "  ${DIM}Available: %s${NC}\n" "$profile_list"
+    printf "  ${WHITE}Selection:${NC} "
+    local input
+    IFS= read -r input 2>/dev/null || true
+
+    if [[ -n "$input" ]]; then
+        init_project_dir "$PROJECT_DIR"
+        local profile_file
+        profile_file=$(get_profile_file_path)
+        # shellcheck disable=SC2086
+        update_profile_section "$profile_file" "profiles" $input
+        success "  Added profiles: $input"
+    fi
+
+    # Slot
+    printf '\n  Create your first container slot? [Y/n] '
+    local answer
+    IFS= read -r answer 2>/dev/null || true
+    answer="${answer:-y}"
+    case "$answer" in
+        [yY]*)
+            local slot_name
+            slot_name=$(create_container "$PROJECT_DIR")
+            success "  Slot created: $slot_name"
+            ;;
+    esac
+
+    # Settings
+    printf '\n  Enable sudo by default? [y/N] '
+    IFS= read -r answer 2>/dev/null || true
+    local flags=""
+    case "$answer" in
+        [yY]*) flags="--enable-sudo" ;;
+    esac
+
+    printf '  Disable firewall by default? [y/N] '
+    IFS= read -r answer 2>/dev/null || true
+    case "$answer" in
+        [yY]*)
+            if [[ -n "$flags" ]]; then
+                flags="$flags --disable-firewall"
+            else
+                flags="--disable-firewall"
+            fi
+            ;;
+    esac
+
+    if [[ -n "$flags" ]]; then
+        mkdir -p "$HOME/.claudebox"
+        for flag in $flags; do
+            printf '%s\n' "$flag"
+        done > "$HOME/.claudebox/default-flags"
+        success "  Saved default flags: $flags"
+    fi
+
+    printf '\n'
+    success "  Setup complete!"
+    printf '\n'
+    printf "  ${CYAN}claudebox${NC}          Launch Claude\n"
+    printf "  ${CYAN}claudebox help${NC}     See all commands\n"
+    printf "  ${CYAN}claudebox setup${NC}    Re-run this wizard\n"
+    printf '\n'
+}
+
+# ── Entry point ───────────────────────────────────────────────
+_cmd_setup() {
+    # Ensure project dir is initialized
     init_project_dir "$PROJECT_DIR"
     PROJECT_PARENT_DIR=$(get_parent_dir "$PROJECT_DIR")
     export PROJECT_PARENT_DIR
 
-    _setup_profiles
-    _setup_create_slot
-    _setup_tunnel
-    _setup_plugins
-    _setup_defaults
+    # Check for Python 3
+    local python_cmd=""
+    if command -v python3 >/dev/null 2>&1; then
+        python_cmd="python3"
+    elif command -v python >/dev/null 2>&1; then
+        # Verify it is Python 3
+        if python -c 'import sys; sys.exit(0 if sys.version_info[0]>=3 else 1)' 2>/dev/null; then
+            python_cmd="python"
+        fi
+    fi
 
-    # Done
-    printf '\n'
-    printf "  ${CYAN}════════════════════════════════════════════════════════════════${NC}\n"
-    printf '\n'
-    success "  Setup complete!"
+    if [[ -z "$python_cmd" ]]; then
+        _setup_fallback
+        exit 0
+    fi
+
+    # Run the Python wizard
+    local result_file
+    result_file=$(mktemp "${TMPDIR:-/tmp}/claudebox-setup.XXXXXX")
+
+    local wizard_exit=0
+    _setup_build_config | "$python_cmd" "${CLAUDEBOX_SCRIPT_DIR}/lib/setup_wizard.py" > "$result_file" || wizard_exit=$?
+
+    if [[ $wizard_exit -ne 0 ]]; then
+        rm -f "$result_file"
+        exit 0
+    fi
+
+    # Check for cancellation
+    if grep -q '^CANCELLED=yes' "$result_file" 2>/dev/null; then
+        rm -f "$result_file"
+        exit 0
+    fi
+
+    # Apply the selections
+    _setup_apply_results "$result_file"
+    rm -f "$result_file"
+
     printf '\n'
     printf "  ${WHITE}Next steps:${NC}\n"
     printf "    ${CYAN}claudebox${NC}          Launch Claude\n"
     printf "    ${CYAN}claudebox help${NC}     See all commands\n"
-    printf "    ${CYAN}claudebox setup${NC}    Re-run this wizard anytime\n"
+    printf "    ${CYAN}claudebox setup${NC}    Re-run this wizard\n"
     printf '\n'
 
     exit 0
 }
 
-export -f _cmd_setup _setup_read_char _setup_ask_yn _setup_header
-export -f _setup_profiles _setup_create_slot _setup_tunnel _setup_plugins _setup_defaults
+export -f _cmd_setup _setup_apply_results _setup_build_config _setup_fallback
