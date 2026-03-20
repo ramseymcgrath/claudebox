@@ -58,6 +58,7 @@ _cmd_auth() {
                 cp "$creds_file" "$auth_dir/credentials.json"
                 cecho "Auth token saved to persistent storage" "$GREEN"
                 printf '%s\n' "Token will be shared across all new containers."
+                printf '%s\n' "Run 'claudebox rebuild' to bake credentials into the image."
                 _auth_propagate_to_slots "$auth_dir/credentials.json"
             else
                 # Save from a specific slot path
@@ -73,6 +74,7 @@ _cmd_auth() {
                 mkdir -p "$auth_dir"
                 cp "$creds_file" "$auth_dir/credentials.json"
                 cecho "Auth token saved from slot '$slot_name' to persistent storage" "$GREEN"
+                printf '%s\n' "Run 'claudebox rebuild' to bake credentials into the image."
                 _auth_propagate_to_slots "$auth_dir/credentials.json"
             fi
             ;;

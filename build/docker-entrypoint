@@ -40,6 +40,24 @@ if [ -f /home/DOCKERUSER/init-firewall ]; then
     /home/DOCKERUSER/init-firewall || true
 fi
 
+# Seed baked-in auth credentials into .claude/ if not already present
+AUTH_CREDS="/opt/claudebox/auth/credentials.json"
+TARGET_CREDS="/home/DOCKERUSER/.claude/.credentials.json"
+if [ -f "$AUTH_CREDS" ] && [ ! -f "$TARGET_CREDS" ]; then
+    # Only seed if the baked file has real content (not the empty {} placeholder)
+    AUTH_SIZE=$(wc -c < "$AUTH_CREDS" 2>/dev/null || printf '0')
+    AUTH_SIZE=$(printf '%s' "$AUTH_SIZE" | tr -d '[:space:]')
+    if [ "$AUTH_SIZE" -gt 10 ] 2>/dev/null; then
+        mkdir -p /home/DOCKERUSER/.claude
+        cp "$AUTH_CREDS" "$TARGET_CREDS"
+        chown DOCKERUSER:DOCKERUSER "$TARGET_CREDS"
+        chmod 600 "$TARGET_CREDS"
+        if [ "${VERBOSE:-false}" = "true" ]; then
+            printf 'DEBUG: Seeded auth credentials from image layer\n' >&2
+        fi
+    fi
+fi
+
 # Handle sudo access based on --enable-sudo flag
 # Note: DOCKERUSER user already has sudoers entry from Dockerfile
 if [ "$ENABLE_SUDO" != "true" ]; then

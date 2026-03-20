@@ -178,7 +178,15 @@ main() {
         cp "${root_dir}/lib/tools-report.sh" "$build_context/tools-report.sh" || error "Failed to copy tools-report.sh"
         cp "${root_dir}/build/dockerignore" "$build_context/.dockerignore" || error "Failed to copy .dockerignore"
         chmod +x "$build_context/docker-entrypoint.sh" "$build_context/init-firewall" "$build_context/generate-tools-readme"
-        
+
+        # Stage auth credentials for baking into core image
+        local auth_creds="$HOME/.claudebox/auth/credentials.json"
+        if [[ -f "$auth_creds" ]]; then
+            cp "$auth_creds" "$build_context/auth-credentials.json"
+        else
+            printf '{}' > "$build_context/auth-credentials.json"
+        fi
+
         # Create core Dockerfile
         local core_dockerfile="$build_context/Dockerfile.core"
         local base_dockerfile=$(cat "${root_dir}/build/Dockerfile") || error "Failed to read base Dockerfile"
@@ -635,6 +643,14 @@ SEDEOF
     # Clean up temp files
     rm -f "$build_context/.tmp_profiles" "$build_context/.tmp_labels" "$build_context/.tmp_base"
     
+    # Stage auth credentials for baking into image
+    local auth_creds="$HOME/.claudebox/auth/credentials.json"
+    if [[ -f "$auth_creds" ]]; then
+        cp "$auth_creds" "$build_context/auth-credentials.json"
+    else
+        printf '{}' > "$build_context/auth-credentials.json"
+    fi
+
     # Build the image
     run_docker_build "$dockerfile" "$build_context"
     

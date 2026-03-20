@@ -8,6 +8,12 @@ USER root
 
 {{LABELS}}
 
+# Bake auth credentials into image (seeded to .claude/ by entrypoint)
+RUN mkdir -p /opt/claudebox/auth
+COPY auth-credentials.json /opt/claudebox/auth/credentials.json
+RUN chown claude:claude /opt/claudebox/auth/credentials.json && \
+    chmod 600 /opt/claudebox/auth/credentials.json
+
 # Switch back to the claude user
 USER claude
 WORKDIR /workspace

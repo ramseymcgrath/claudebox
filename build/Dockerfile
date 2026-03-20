@@ -151,6 +151,12 @@ RUN bash -c "source $NVM_DIR/nvm.sh && claude --version"
 WORKDIR /workspace
 USER root
 
+# Bake auth credentials into image (seeded to .claude/ by entrypoint)
+RUN mkdir -p /opt/claudebox/auth
+COPY auth-credentials.json /opt/claudebox/auth/credentials.json
+RUN chown $USER_ID:$GROUP_ID /opt/claudebox/auth/credentials.json && \
+    chmod 600 /opt/claudebox/auth/credentials.json
+
 COPY --chown=$USERNAME docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 RUN sed -i "s|DOCKERUSER|$USERNAME|g" /usr/local/bin/docker-entrypoint && \
     sed -i "s|DOCKERUSER|$USERNAME|g" /home/$USERNAME/init-firewall && \
