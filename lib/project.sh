@@ -515,16 +515,27 @@ sync_commands_to_project() {
     # Calculate checksums of source directories
     local cbox_checksum=""
     local user_checksum=""
-    
+
+    # Portable checksum command (sha256sum on Linux, shasum on macOS)
+    local sha_cmd=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha_cmd="sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then
+        sha_cmd="shasum -a 256"
+    else
+        error "sha256sum or shasum required"
+        return 1
+    fi
+
     # Get checksum of cbox commands if directory exists
     if [[ -d "$cbox_source" ]]; then
         # Find all files, get their content checksum, sort for consistency
-        cbox_checksum=$(find "$cbox_source" -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+        cbox_checksum=$(find "$cbox_source" -type f -exec $sha_cmd {} \; 2>/dev/null | sort | $sha_cmd | cut -d' ' -f1)
     fi
-    
+
     # Get checksum of user commands if directory exists
     if [[ -d "$user_source" ]]; then
-        user_checksum=$(find "$user_source" -type f -exec sha256sum {} \; 2>/dev/null | sort | sha256sum | cut -d' ' -f1)
+        user_checksum=$(find "$user_source" -type f -exec $sha_cmd {} \; 2>/dev/null | sort | $sha_cmd | cut -d' ' -f1)
     fi
     
     # Check if cbox commands need syncing

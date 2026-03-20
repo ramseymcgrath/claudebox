@@ -59,7 +59,16 @@
       "Bash(shellcheck /Users/ramseymcgrath/code/claudebox/lib/commands.dash.sh)",
       "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.dash.sh 2>&1)",
       "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.sh)",
-      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/cli.sh)"
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/cli.sh)",
+      "Bash(./main.sh install:*)",
+      "Bash(docker builder:*)",
+      "Bash(docker run:*)",
+      "Bash(wget -q --spider \"https://github.com/dandavison/delta/releases/download/0.19.0/git-delta_0.19.0_arm64.deb\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -sIL \"https://github.com/dandavison/delta/releases/download/0.19.0/git-delta_0.19.0_arm64.deb\")",
+      "Bash(curl -sL \"https://api.github.com/repos/dandavison/delta/releases/latest\")",
+      "Bash(curl -sL \"https://api.github.com/repos/dandavison/delta/releases\")",
+      "Bash(curl -sL \"https://api.github.com/repos/dandavison/delta/releases/tags/0.18.2\")"
     ]
   },
   "enableAllProjectMcpServers": true,
