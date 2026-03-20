@@ -317,15 +317,15 @@ run_claudebox_container() {
     # Set up cleanup trap for temporary MCP config files
     cleanup_mcp_files() {
         local file
-        for file in "${mcp_temp_files[@]}"; do
+        for file in "${mcp_temp_files[@]+"${mcp_temp_files[@]}"}"; do
             if [[ -f "$file" ]]; then
                 rm -f "$file"
             fi
         done
-        if [[ -n "$user_mcp_file" ]] && [[ -f "$user_mcp_file" ]]; then
+        if [[ -n "${user_mcp_file:-}" ]] && [[ -f "${user_mcp_file:-}" ]]; then
             rm -f "$user_mcp_file"
         fi
-        if [[ -n "$project_mcp_file" ]] && [[ -f "$project_mcp_file" ]]; then
+        if [[ -n "${project_mcp_file:-}" ]] && [[ -f "${project_mcp_file:-}" ]]; then
             rm -f "$project_mcp_file"
         fi
     }
