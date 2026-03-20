@@ -54,7 +54,12 @@
       "Bash(bash -n lib/commands.sh)",
       "Bash(bash -n lib/cli.sh)",
       "Bash(printf \"All syntax OK\\\\n\")",
-      "WebFetch(domain:download.docker.com)"
+      "WebFetch(domain:download.docker.com)",
+      "Bash(wc -l /Users/ramseymcgrath/code/claudebox/lib/*.sh)",
+      "Bash(shellcheck /Users/ramseymcgrath/code/claudebox/lib/commands.dash.sh)",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.dash.sh 2>&1)",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/commands.sh)",
+      "Bash(bash -n /Users/ramseymcgrath/code/claudebox/lib/cli.sh)"
     ]
   },
   "enableAllProjectMcpServers": true,

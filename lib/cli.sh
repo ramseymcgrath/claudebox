@@ -9,7 +9,7 @@
 # Four flag buckets (Bash 3.2 compatible - no associative arrays)
 readonly HOST_ONLY_FLAGS=(--verbose rebuild)
 readonly CONTROL_FLAGS=(--enable-sudo --disable-firewall)
-readonly SCRIPT_COMMANDS=(shell create slot slots revoke profiles projects profile info help -h --help add remove install allowlist clean save project tmux kill doctor snapshot setup auth gateway vm agent mcp import unlink reinstall uninstall devcontainer)
+readonly SCRIPT_COMMANDS=(shell create slot slots revoke profiles projects profile info help -h --help add remove install allowlist clean save project tmux kill doctor snapshot setup auth gateway vm agent mcp import unlink reinstall uninstall devcontainer dash)
 
 # parse_cli_args - Central CLI parsing with four-bucket architecture
 # Usage: parse_cli_args "$@"
@@ -82,7 +82,7 @@ get_command_requirements() {
     
     case "$cmd" in
         # Pure host commands - no Docker or image needed
-        profiles|projects|help|-h|--help|slots|create|revoke|clean|import|unlink|kill|auth|gateway|setup|vm|doctor|reinstall|uninstall)
+        profiles|projects|help|-h|--help|slots|create|revoke|clean|import|unlink|kill|auth|gateway|setup|vm|doctor|reinstall|uninstall|dash)
             echo "none"
             ;;
         # Commands that need image name but not Docker

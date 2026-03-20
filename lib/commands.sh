@@ -122,6 +122,13 @@ source "${LIB_DIR}/commands.doctor.sh"
 source "${LIB_DIR}/commands.snapshot.sh"
 
 # ============================================================================
+# DASHBOARD COMMAND - Interactive container management
+# ============================================================================
+# Commands: dash
+# - dash: Interactive dashboard to view, connect, kill, and delete containers
+source "${LIB_DIR}/commands.dash.sh"
+
+# ============================================================================
 # DEVCONTAINER COMMANDS - VS Code Dev Container integration
 # ============================================================================
 # Commands: devcontainer
@@ -195,6 +202,7 @@ show_help() {
   gateway                         Configure Cloudflare AI Gateway
   mcp install <server>            Install an MCP server into the image
   mcp list                        List known/installed MCP servers
+  dash                            Interactive container dashboard
   doctor                          Run diagnostic health checks
   snapshot [name]                 Save current slot state
   snapshot list                   List saved snapshots
@@ -315,6 +323,7 @@ show_full_help() {
   project <name>                  Open project by name/hash from anywhere\
   tmux                            Launch ClaudeBox with tmux support enabled\
   devcontainer                    Generate VS Code Dev Container config\
+  dash                            Interactive container dashboard\
   doctor                          Run diagnostic health checks\
   snapshot [name]                 Save current slot state\
   snapshot restore <name>         Restore a snapshot to a slot\
@@ -407,6 +416,7 @@ dispatch_command() {
         # Doctor and snapshot commands
         doctor)           _cmd_doctor "$@" ;;
         snapshot)         _cmd_snapshot "$@" ;;
+        dash)             _cmd_dash "$@" ;;
         devcontainer)     _cmd_devcontainer "$@" ;;
 
         # Special commands that modify container
