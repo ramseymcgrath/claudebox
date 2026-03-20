@@ -582,27 +582,29 @@ class StatusScreen:
 
 def check_gateway_url(account_id, gateway_id):
     """Test connectivity to Cloudflare AI Gateway endpoint."""
-    import urllib.request
-    import urllib.error
-    import ssl
+    import subprocess
 
     url = 'https://gateway.ai.cloudflare.com/v1/%s/%s/anthropic' % (
         account_id, gateway_id)
-    req = urllib.request.Request(url, method='HEAD')
-    req.add_header('User-Agent', 'ClaudeBox-Setup/1.0')
-    ctx = ssl.create_default_context()
 
     try:
-        resp = urllib.request.urlopen(req, timeout=10, context=ctx)
-        return True, 'Gateway reachable (HTTP %d)' % resp.getcode()
-    except urllib.error.HTTPError as e:
-        # 4xx from the gateway means the endpoint exists
-        if e.code in (400, 401, 403, 404, 405, 415):
-            return True, 'Gateway reachable (HTTP %d)' % e.code
-        return False, 'HTTP error: %d %s' % (e.code, e.reason)
-    except urllib.error.URLError as e:
-        reason = str(e.reason) if hasattr(e, 'reason') else str(e)
-        return False, 'Connection failed: %s' % reason
+        result = subprocess.run(
+            ['curl', '-fsSL', '-o', '/dev/null', '-w', '%{http_code}',
+             '--max-time', '10', '-I', url],
+            capture_output=True, text=True, timeout=15)
+        code = result.stdout.strip()
+        if code and code.isdigit():
+            return True, 'Gateway reachable (HTTP %s)' % code
+        # curl returns non-zero for 4xx/5xx with -f, but any response means reachable
+        if result.returncode == 22:
+            return True, 'Gateway reachable (HTTP error, endpoint exists)'
+        if result.returncode != 0:
+            return False, 'Connection failed: %s' % result.stderr.strip()
+        return True, 'Gateway reachable'
+    except FileNotFoundError:
+        return False, 'curl not found'
+    except subprocess.TimeoutExpired:
+        return False, 'Connection timed out'
     except Exception as e:
         return False, 'Error: %s' % str(e)
 
