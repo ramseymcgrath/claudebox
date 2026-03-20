@@ -4,6 +4,30 @@
 # Commands: auth, gateway
 # Manages persistent auth tokens and Cloudflare AI Gateway configuration
 
+_auth_propagate_to_slots() {
+    # Propagate saved credentials to all existing unauthenticated slots
+    local auth_creds="$1"
+    local parent_dir
+    parent_dir=$(get_parent_dir "$PROJECT_DIR")
+    local max
+    max=$(read_counter "$parent_dir")
+    local propagated=0
+
+    for ((idx=1; idx<=max; idx++)); do
+        local name
+        name=$(generate_container_name "$PROJECT_DIR" "$idx")
+        local dir="$parent_dir/$name"
+        if [[ -d "$dir/.claude" ]] && [[ ! -f "$dir/.claude/.credentials.json" ]]; then
+            cp "$auth_creds" "$dir/.claude/.credentials.json"
+            ((propagated++)) || true
+        fi
+    done
+
+    if [[ $propagated -gt 0 ]]; then
+        printf '%s\n' "Credentials propagated to $propagated existing slot(s)."
+    fi
+}
+
 _cmd_auth() {
     local auth_dir="$HOME/.claudebox/auth"
 
@@ -34,6 +58,7 @@ _cmd_auth() {
                 cp "$creds_file" "$auth_dir/credentials.json"
                 cecho "Auth token saved to persistent storage" "$GREEN"
                 printf '%s\n' "Token will be shared across all new containers."
+                _auth_propagate_to_slots "$auth_dir/credentials.json"
             else
                 # Save from a specific slot path
                 init_project_dir "$PROJECT_DIR"
@@ -48,6 +73,7 @@ _cmd_auth() {
                 mkdir -p "$auth_dir"
                 cp "$creds_file" "$auth_dir/credentials.json"
                 cecho "Auth token saved from slot '$slot_name' to persistent storage" "$GREEN"
+                _auth_propagate_to_slots "$auth_dir/credentials.json"
             fi
             ;;
 
@@ -304,4 +330,4 @@ _cmd_gateway() {
     esac
 }
 
-export -f _cmd_auth _cmd_gateway
+export -f _cmd_auth _cmd_gateway _auth_propagate_to_slots

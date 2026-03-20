@@ -217,24 +217,22 @@ _mcp_install() {
     local temp_container="claudebox-mcp-install-$$"
 
     # Run installation in a temporary container
-    docker run --rm --name "$temp_container" \
-        "$IMAGE_NAME" bash -c "
-            source \$HOME/.nvm/nvm.sh
-            nvm use default >/dev/null 2>&1
-            npm install -g $pkg_name
-        " || error "Failed to install $pkg_name"
-
-    # Now run again without --rm so we can commit
+    # Use --entrypoint to bypass docker-entrypoint (avoids firewall/iptables, Claude CLI launch, slot issues)
     docker run -d --name "$temp_container" \
-        "$IMAGE_NAME" bash -c "
+        --entrypoint bash \
+        "$IMAGE_NAME" -c "
             source \$HOME/.nvm/nvm.sh
             nvm use default >/dev/null 2>&1
             npm install -g $pkg_name
-            sleep 2
         " >/dev/null
 
     # Wait for install to finish
-    docker wait "$temp_container" >/dev/null 2>&1
+    local exit_code
+    exit_code=$(docker wait "$temp_container" 2>/dev/null || printf '1')
+    if [[ "$exit_code" != "0" ]]; then
+        docker rm -f "$temp_container" >/dev/null 2>&1
+        error "Failed to install $pkg_name"
+    fi
 
     # Commit the changes to the image
     docker commit "$temp_container" "$IMAGE_NAME" >/dev/null
@@ -327,11 +325,11 @@ _mcp_remove() {
         if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
             local temp_container="claudebox-mcp-remove-$$"
             docker run -d --name "$temp_container" \
-                "$IMAGE_NAME" bash -c "
+                --entrypoint bash \
+                "$IMAGE_NAME" -c "
                     source \$HOME/.nvm/nvm.sh
                     nvm use default >/dev/null 2>&1
                     npm uninstall -g $pkg_name 2>/dev/null || true
-                    sleep 1
                 " >/dev/null
 
             docker wait "$temp_container" >/dev/null 2>&1

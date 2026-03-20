@@ -109,7 +109,7 @@ write_counter() {
 init_slot_dir() {
     local dir="$1"
     mkdir -p "$dir"
-    
+
     # Check if claude/ directory exists in the claudebox root to seed .claude
     local claude_source="${CLAUDEBOX_SCRIPT_DIR:-${SCRIPT_DIR}}/claude"
     if [[ -d "$claude_source" ]]; then
@@ -119,7 +119,13 @@ init_slot_dir() {
         # Fall back to creating empty .claude directory
         mkdir -p "$dir/.claude"
     fi
-    
+
+    # Seed persistent auth credentials into the new slot if available
+    local auth_creds="$HOME/.claudebox/auth/credentials.json"
+    if [[ -f "$auth_creds" ]]; then
+        cp "$auth_creds" "$dir/.claude/.credentials.json"
+    fi
+
     mkdir -p "$dir/.config"
     mkdir -p "$dir/.cache"
     # Don't pre-create .claude.json - let Claude create it naturally
