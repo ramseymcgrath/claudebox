@@ -126,7 +126,7 @@ main() {
                 if [[ ${#saved_flags[@]} -gt 0 ]]; then
                     # Re-parse WITH saved flags, but the command structure is preserved
                     # because the command was already identified from original args
-                    parse_cli_args "${original_args[@]}" "${saved_flags[@]}"
+                    parse_cli_args ${original_args[@]+"${original_args[@]}"} "${saved_flags[@]}"
                     process_host_flags
                     
                     if [[ "$VERBOSE" == "true" ]]; then
@@ -465,7 +465,7 @@ main() {
                 # Re-parse all arguments with saved flags included
                 if [[ ${#saved_flags[@]} -gt 0 ]]; then
                     # Combine original args with saved flags
-                    local all_args=("${original_args[@]}" "${saved_flags[@]}")
+                    local all_args=(${original_args[@]+"${original_args[@]}"} "${saved_flags[@]}")
                     
                     # Re-parse to properly sort flags
                     parse_cli_args "${all_args[@]}"
